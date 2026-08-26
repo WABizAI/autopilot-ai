@@ -387,84 +387,124 @@ Create a professional blog featured image.
         {
           method: "POST",
 
-          headers: {
-            Authorization: `Bearer ${hfToken}`,
-            "Content-Type": "application/json"
-          },
+// =====================================================
+// STEP 2 — HUGGING FACE FEATURED IMAGE
+// =====================================================
 
-          body: JSON.stringify({
-            inputs: imagePrompt,
+let image = null;
 
-            parameters: {
-              width: 1344,
-              height: 768,
-              num_inference_steps: 4
-            }
-          })
-        }
-      );
+const imagePrompt =
+  article.imagePrompt ||
+  `
+Create a premium professional editorial featured image.
 
-      console.log(
-        "HUGGING FACE IMAGE STATUS:",
-        imageResponse.status
-      );
+Article topic:
+${cleanKeyword}
 
-      const contentType =
-        imageResponse.headers.get("content-type") || "";
+Article title:
+${article.title || cleanKeyword}
 
-      if (!imageResponse.ok) {
-        const errorText =
-          await imageResponse.text();
+Create a visually compelling scene that directly represents
+the article topic.
 
-        console.error(
-          "HUGGING FACE IMAGE API ERROR STATUS:",
-          imageResponse.status
-        );
+Style:
+- photorealistic
+- premium editorial photography
+- modern
+- sophisticated
+- professional
+- natural cinematic lighting
+- realistic materials
+- realistic depth
+- strong composition
+- high-end publication quality
 
-        console.error(
-          "HUGGING FACE IMAGE API ERROR:",
-          errorText
-        );
-      } else if (
-        contentType.startsWith("image/")
-      ) {
-        const imageBuffer =
-          Buffer.from(
-            await imageResponse.arrayBuffer()
-          );
+Composition:
+- wide landscape composition
+- clear main subject
+- strong visual hierarchy
+- professional camera perspective
+- natural depth of field
+- balanced composition
 
-        if (imageBuffer.length > 0) {
-          image = {
-            mimeType:
-              contentType || "image/png",
+Do NOT include:
+- text
+- letters
+- words
+- logos
+- watermarks
+- UI
+- screenshots
+- fake interfaces
+- distorted objects
+- duplicated objects
+`;
 
-            data:
-              imageBuffer.toString("base64")
-          };
+try {
+  console.log(
+    "Starting Hugging Face image generation..."
+  );
 
-          console.log(
-            "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
-          );
-        }
-      } else {
-        const responseText =
-          await imageResponse.text();
+  const hf = new InferenceClient(
+    process.env.HF_TOKEN
+  );
 
-        console.error(
-          "HUGGING FACE RETURNED NON-IMAGE RESPONSE:"
-        );
+  const generatedImage =
+    await hf.textToImage({
+      provider: "fal-ai",
 
-        console.error(
-          responseText.slice(0, 3000)
-        );
+      model:
+        "black-forest-labs/FLUX.1-dev",
+
+      inputs: imagePrompt,
+
+      parameters: {
+        width: 1344,
+        height: 768,
+        num_inference_steps: 4
       }
+    });
 
-    } catch (imageError) {
-      console.error(
-        "HUGGING FACE IMAGE GENERATION FAILED:",
-        imageError
-      );
-    }
+  /*
+   * Hugging Face returns a Blob for text-to-image.
+   * Convert it into base64 so the frontend can display it.
+   */
+
+  const imageBuffer =
+    Buffer.from(
+      await generatedImage.arrayBuffer()
+    );
+
+  if (imageBuffer.length > 0) {
+    image = {
+      mimeType:
+        generatedImage.type ||
+        "image/png",
+
+      data:
+        imageBuffer.toString("base64")
+    };
+
+    console.log(
+      "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+    );
+  } else {
+    console.error(
+      "HUGGING FACE RETURNED EMPTY IMAGE"
+    );
+  }
+
+} catch (imageError) {
+
+  console.error(
+    "HUGGING FACE IMAGE GENERATION FAILED:"
+  );
+
+  console.error(
+    imageError?.message ||
+    imageError
+  );
+}
 
     // =====================================================
     // STEP 3 — WORD COUNT
