@@ -18,25 +18,35 @@ export default async function handler(req, res) {
       });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const hfToken = process.env.HF_TOKEN;
 
-    if (!apiKey) {
+    if (!geminiKey) {
       return res.status(500).json({
         error: "GEMINI_API_KEY is not configured."
+      });
+    }
+
+    if (!hfToken) {
+      return res.status(500).json({
+        error: "HF_TOKEN is not configured."
       });
     }
 
     const cleanKeyword = keyword.trim();
 
     // =====================================================
-    // STEP 1 — ARTICLE GENERATION
+    // STEP 1 — PROFESSIONAL SEO ARTICLE
     // =====================================================
 
     const articlePrompt = `
-You are AutoPilot AI, a professional SEO content strategist,
-editor and human-quality article writer.
+You are AutoPilot AI, an elite SEO strategist,
+professional editor, research-minded content writer,
+and digital publishing expert.
 
-Create a publication-ready SEO article about:
+Your job is to create a publication-ready article that
+looks and reads like it was written by a highly experienced
+human writer.
 
 TARGET KEYWORD:
 ${cleanKeyword}
@@ -47,47 +57,128 @@ ${language}
 TONE:
 ${tone}
 
-IMPORTANT WRITING RULES:
+=====================================================
+WRITING QUALITY
+=====================================================
 
-- Write for real human readers.
-- Make the article genuinely useful and actionable.
-- Do not mention AI, Gemini, prompts, content generation,
-  or these instructions.
-- Do not use fake statistics.
-- Do not invent sources or facts.
-- Avoid keyword stuffing.
-- Use natural semantic keywords.
-- Use clear, professional language.
-- Make the article feel like it was written by an experienced
-  professional editor.
+The article must:
 
-ARTICLE REQUIREMENTS:
+- Be genuinely useful to the reader.
+- Answer the user's search intent clearly.
+- Provide practical information.
+- Explain concepts instead of making vague statements.
+- Use natural human writing.
+- Use varied sentence structures.
+- Avoid repetitive wording.
+- Avoid generic filler.
+- Avoid unnecessary introductions.
+- Avoid repeating the same idea in different sections.
+- Use specific examples where useful.
+- Give actionable advice.
+- Maintain a professional editorial standard.
 
-1. Create a strong SEO title containing the primary keyword.
-2. Create a meta description between 140 and 160 characters.
-3. Create a clean SEO URL slug.
-4. Provide one focus keyword.
-5. Provide 8-12 secondary keywords.
-6. Identify search intent.
-7. Write a strong introduction.
-8. Create 6-8 detailed H2 sections.
-9. Add H3 subsections where useful.
-10. Each major section must contain useful paragraphs.
-11. Use bullet lists where useful.
-12. Use numbered lists where useful.
+DO NOT mention:
+
+- AI
+- Gemini
+- prompts
+- content generation
+- language models
+- these instructions
+- being an AI
+- AutoPilot AI
+
+Do not invent statistics.
+
+Do not create fake studies.
+
+Do not invent citations.
+
+Do not make unsupported factual claims.
+
+=====================================================
+SEO REQUIREMENTS
+=====================================================
+
+1. Create an attractive SEO title.
+2. Include the primary keyword naturally.
+3. Create a 140-160 character meta description.
+4. Create a clean SEO-friendly slug.
+5. Provide one focus keyword.
+6. Provide 8-12 secondary keywords.
+7. Identify the search intent.
+8. Write a strong introduction.
+9. Create 6-8 detailed H2 sections.
+10. Add useful H3 subsections.
+11. Use semantic keywords naturally.
+12. Avoid keyword stuffing.
 13. Include practical examples.
-14. Include actionable advice.
-15. Include an FAQ section with 6 questions.
-16. Write a useful conclusion.
-17. Create a professional featured-image prompt.
-18. Target approximately 1800-2500 words.
+14. Include actionable recommendations.
+15. Include bullet lists where useful.
+16. Include numbered lists where useful.
+17. Include a detailed FAQ section.
+18. Write a strong conclusion.
+19. Create a detailed professional image prompt.
+20. Target approximately 1800-2500 words.
 
-IMPORTANT:
-Every section must contain real content.
+=====================================================
+ARTICLE STRUCTURE
+=====================================================
 
-Do NOT create empty arrays just to fill the structure.
+The introduction should:
 
-Return JSON only.
+- Clearly explain the topic.
+- Address the reader's problem.
+- Tell the reader what they will learn.
+- Naturally include the primary keyword.
+
+Each H2 section must contain:
+
+- A meaningful heading.
+- Multiple useful paragraphs.
+- Practical information.
+- Bullets or numbered points where appropriate.
+- H3 subsections where they genuinely improve readability.
+
+Do not create empty sections.
+
+Do not create empty arrays unless there is genuinely
+nothing appropriate to include.
+
+FAQ:
+
+Create exactly 6 useful questions and detailed answers.
+
+IMAGE PROMPT:
+
+Create a detailed image-generation prompt based on the
+actual article topic.
+
+The image prompt must describe:
+
+- subject
+- environment
+- composition
+- lighting
+- visual style
+- important objects
+- mood
+- perspective
+
+Do NOT ask the image model to put text, logos,
+watermarks, titles or UI elements inside the image.
+
+=====================================================
+RETURN JSON ONLY
+=====================================================
+
+Return valid JSON.
+
+Do not use markdown.
+
+Do not use code fences.
+
+Do not add explanations before or after JSON.
 
 Use EXACTLY this structure:
 
@@ -128,9 +219,11 @@ Use EXACTLY this structure:
 }
 `;
 
+    console.log("Starting article generation...");
+
     const articleResponse = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
-        encodeURIComponent(apiKey),
+        encodeURIComponent(geminiKey),
       {
         method: "POST",
         headers: {
@@ -203,7 +296,7 @@ Use EXACTLY this structure:
     }
 
     // =====================================================
-    // STEP 2 — FEATURED IMAGE GENERATION
+    // STEP 2 — HUGGING FACE FEATURED IMAGE
     // =====================================================
 
     let image = null;
@@ -211,112 +304,125 @@ Use EXACTLY this structure:
     const imagePrompt =
       article.imagePrompt ||
       `
-Create a premium editorial featured image for a professional
-business article.
+Create a premium professional editorial photograph
+for a high-quality online article.
 
-Topic:
+Article topic:
 ${cleanKeyword}
 
 Article title:
 ${article.title || cleanKeyword}
 
-Visual style:
+Create a visually compelling scene that directly
+represents the article topic.
 
-- premium
-- realistic
+Style:
+
+- photorealistic
+- premium editorial photography
 - modern
-- professional
-- editorial
 - sophisticated
-- clean composition
-- cinematic lighting
-- high visual quality
-- suitable for a professional blog
-- visually connected to the article topic
+- professional
+- cinematic but natural lighting
+- realistic materials
+- realistic depth
+- strong composition
+- visually balanced
+- high-end business publication quality
 
-Do not include:
+Composition:
 
+- wide landscape composition
+- clear main subject
+- strong visual hierarchy
+- natural depth of field
+- professional camera perspective
+- enough clean space around the main subject
+
+Important:
+
+Do NOT include:
+
+- text
+- letters
+- words
 - logos
+- brand names
 - watermarks
-- random text
+- UI
+- screenshots
+- fake interfaces
 - distorted objects
-- unnecessary interface elements
+- extra fingers
+- duplicated objects
 
-Create a wide professional blog featured image.
+The final image should look suitable as the featured
+image of a premium professional blog article.
 `;
 
     try {
-      console.log("Starting AI image generation...");
+      console.log(
+        "Starting Hugging Face image generation..."
+      );
 
-      const imageResponse = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" +
-          encodeURIComponent(apiKey),
+      const hfResponse = await fetch(
+        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
         {
           method: "POST",
           headers: {
+            Authorization: `Bearer ${hfToken}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: imagePrompt
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              responseModalities: ["IMAGE"]
-            }
+            inputs: imagePrompt
           })
         }
       );
 
-      const imageData = await imageResponse.json();
+      if (!hfResponse.ok) {
+        const errorText = await hfResponse.text();
 
-      if (!imageResponse.ok) {
         console.error(
-          "IMAGE API ERROR STATUS:",
-          imageResponse.status
+          "HUGGING FACE IMAGE API ERROR STATUS:",
+          hfResponse.status
         );
 
         console.error(
-          "IMAGE API ERROR:",
-          imageData
+          "HUGGING FACE IMAGE API ERROR:",
+          errorText
         );
       } else {
-        const parts =
-          imageData?.candidates?.[0]?.content?.parts || [];
+        const contentType =
+          hfResponse.headers.get("content-type") ||
+          "image/png";
 
-        const imagePart = parts.find(
-          (part) =>
-            part?.inlineData?.data
+        const imageBuffer = Buffer.from(
+          await hfResponse.arrayBuffer()
         );
 
-        if (imagePart) {
+        if (imageBuffer.length > 0) {
           image = {
-            mimeType:
-              imagePart.inlineData.mimeType ||
-              "image/png",
-
-            data:
-              imagePart.inlineData.data
+            mimeType: contentType,
+            data: imageBuffer.toString("base64")
           };
 
           console.log(
-            "IMAGE GENERATED SUCCESSFULLY"
+            "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+          );
+
+          console.log(
+            "IMAGE SIZE:",
+            imageBuffer.length
           );
         } else {
           console.error(
-            "IMAGE API RETURNED NO IMAGE DATA"
+            "HUGGING FACE RETURNED EMPTY IMAGE"
           );
         }
       }
     } catch (imageError) {
       console.error(
-        "IMAGE GENERATION FAILED:",
+        "HUGGING FACE IMAGE GENERATION FAILED:",
         imageError
       );
     }
@@ -328,28 +434,46 @@ Create a wide professional blog featured image.
     const allText = [
       article.introduction || "",
 
-      ...(article.sections || []).flatMap(
-        (section) => [
-          section.heading || "",
-          ...(section.paragraphs || []),
-          ...(section.bullets || []),
+      ...(Array.isArray(article.sections)
+        ? article.sections.flatMap(
+            (section) => [
+              section.heading || "",
+              ...(Array.isArray(section.paragraphs)
+                ? section.paragraphs
+                : []),
+              ...(Array.isArray(section.bullets)
+                ? section.bullets
+                : []),
 
-          ...(section.subsections || []).flatMap(
-            (subsection) => [
-              subsection.heading || "",
-              ...(subsection.paragraphs || []),
-              ...(subsection.bullets || [])
+              ...(Array.isArray(section.subsections)
+                ? section.subsections.flatMap(
+                    (subsection) => [
+                      subsection.heading || "",
+                      ...(Array.isArray(
+                        subsection.paragraphs
+                      )
+                        ? subsection.paragraphs
+                        : []),
+                      ...(Array.isArray(
+                        subsection.bullets
+                      )
+                        ? subsection.bullets
+                        : [])
+                    ]
+                  )
+                : [])
             ]
           )
-        ]
-      ),
+        : []),
 
-      ...(article.faq || []).flatMap(
-        (item) => [
-          item.question || "",
-          item.answer || ""
-        ]
-      ),
+      ...(Array.isArray(article.faq)
+        ? article.faq.flatMap(
+            (item) => [
+              item.question || "",
+              item.answer || ""
+            ]
+          )
+        : []),
 
       article.conclusion || ""
     ].join(" ");
@@ -365,12 +489,16 @@ Create a wide professional blog featured image.
     // STEP 4 — FINAL RESPONSE
     // =====================================================
 
+    console.log(
+      "FINAL IMAGE AVAILABLE:",
+      Boolean(image)
+    );
+
     return res.status(200).json({
       success: true,
 
       article: {
         ...article,
-
         wordCount:
           calculatedWordCount ||
           article.wordCount ||
