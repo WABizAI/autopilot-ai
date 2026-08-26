@@ -214,15 +214,42 @@ function App() {
      AI AGENT
   ========================= */
 
-  const runAgent = () => {
-    if (!command.trim()) return;
+  const runAgent = async () => {
+  if (!command.trim() || agentRunning) return;
 
-    setAgentRunning(true);
+  setAgentRunning(true);
 
-    setTimeout(() => {
-      setAgentRunning(false);
-    }, 2500);
-  };
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        prompt: command
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.error || "AI request failed.");
+    }
+
+    alert(data.response || "AI completed the task.");
+
+    setCommand("");
+  } catch (error) {
+    console.error(error);
+
+    alert(
+      error.message ||
+        "AI Agent could not complete the request."
+    );
+  } finally {
+    setAgentRunning(false);
+  }
+};
 
   return (
     <div className="app-shell">
