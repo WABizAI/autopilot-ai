@@ -284,20 +284,8 @@ Landscape blog featured image.
               ],
 
               generationConfig: {
-                responseModalities: [
-                  "TEXT",
-                  "IMAGE"
-                ],
-
-                responseFormat: {
-                  image: {
-                    aspectRatio: "16:9",
-                    imageSize: "2K"
-                  }
-                }
-              }
-            })
-          }
+  responseModalities: ["IMAGE"]
+}
         );
 
       const imageData =
