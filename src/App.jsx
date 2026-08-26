@@ -28,7 +28,6 @@ import {
   Zap,
   X,
   Copy,
-  Download,
   RefreshCw,
   Eye,
   Target,
@@ -36,6 +35,7 @@ import {
   Type,
   AlignLeft,
   Check,
+  Download,
   ExternalLink
 } from "lucide-react";
 
@@ -112,48 +112,38 @@ const defaultRecentContent = [
 ========================================================= */
 
 function App() {
-  /* =======================================================
-     AUTH
-  ======================================================= */
-
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-
-  /* =======================================================
-     DASHBOARD
-  ======================================================= */
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
 
-  /* =======================================================
-     AI COMMAND
-  ======================================================= */
-
   const [command, setCommand] = useState("");
   const [agentRunning, setAgentRunning] = useState(false);
 
-  /* =======================================================
-     ARTICLE GENERATOR
-  ======================================================= */
+  /* ARTICLE */
 
   const [articleModal, setArticleModal] = useState(false);
 
   const [articleKeyword, setArticleKeyword] = useState("");
-  const [articleAudience, setArticleAudience] = useState("General audience");
-  const [articleTone, setArticleTone] = useState("Professional");
-  const [articleLength, setArticleLength] = useState("Long");
-  const [articleLanguage, setArticleLanguage] = useState("English");
+  const [articleAudience, setArticleAudience] =
+    useState("General audience");
+  const [articleTone, setArticleTone] =
+    useState("Professional");
+  const [articleLength, setArticleLength] =
+    useState("Long");
+  const [articleLanguage, setArticleLanguage] =
+    useState("English");
 
   const [articleLoading, setArticleLoading] = useState(false);
   const [articleError, setArticleError] = useState("");
   const [articleResult, setArticleResult] = useState(null);
 
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const [recentContent, setRecentContent] = useState(
-    defaultRecentContent
-  );
+  const [recentContent, setRecentContent] =
+    useState(defaultRecentContent);
 
   /* =======================================================
      AUTH SESSION
@@ -163,12 +153,16 @@ function App() {
     let mounted = true;
 
     const loadSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } =
+        await supabase.auth.getSession();
 
       if (!mounted) return;
 
       if (error) {
-        console.error("Supabase session error:", error);
+        console.error(
+          "Supabase session error:",
+          error
+        );
       }
 
       setSession(data?.session ?? null);
@@ -179,12 +173,14 @@ function App() {
 
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (!mounted) return;
+    } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (!mounted) return;
 
-      setSession(newSession);
-      setAuthLoading(false);
-    });
+        setSession(newSession);
+        setAuthLoading(false);
+      }
+    );
 
     return () => {
       mounted = false;
@@ -206,7 +202,9 @@ function App() {
 
           <strong>AutoPilot AI</strong>
 
-          <span>Loading your workspace...</span>
+          <span>
+            Loading your workspace...
+          </span>
         </div>
       </div>
     );
@@ -228,32 +226,43 @@ function App() {
     if (!command.trim() || agentRunning) return;
 
     setAgentRunning(true);
+    setArticleError("");
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: command
-        })
-      });
+      const response = await fetch(
+        "/api/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            prompt: command
+          })
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.error || "AI request failed."
+          data?.error ||
+            "AI request failed."
         );
       }
 
       setArticleResult({
         title: "AI Agent Response",
-        content: data.response || "Task completed.",
-        imageUrl: null,
         metaDescription: "",
-        keyword: command,
+        focusKeyword: command,
+        secondaryKeywords: [],
+        searchIntent: "",
+        excerpt: "",
+        introduction: data.response || "",
+        sections: [],
+        faq: [],
+        conclusion: "",
+        imageUrl: null,
         wordCount: (data.response || "")
           .split(/\s+/)
           .filter(Boolean).length
@@ -262,7 +271,10 @@ function App() {
       setArticleModal(true);
       setCommand("");
     } catch (error) {
-      console.error("AI Agent error:", error);
+      console.error(
+        "AI Agent error:",
+        error
+      );
 
       setArticleError(
         error.message ||
@@ -285,55 +297,178 @@ function App() {
   };
 
   /* =======================================================
+     CONVERT GENERATED IMAGE
+  ======================================================= */
+
+  const convertGeneratedImage = (
+    image
+  ) => {
+    if (!image) return null;
+
+    /* Already URL */
+
+    if (typeof image === "string") {
+      if (
+        image.startsWith("http://") ||
+        image.startsWith("https://") ||
+        image.startsWith("data:image/")
+      ) {
+        return image;
+      }
+
+      return `data:image/png;base64,${image}`;
+    }
+
+    /* Gemini inlineData structure */
+
+    const data =
+      image?.data ||
+      image?.inlineData?.data;
+
+    const mimeType =
+      image?.mimeType ||
+      image?.inlineData?.mimeType ||
+      "image/png";
+
+    if (!data) return null;
+
+    return `data:${mimeType};base64,${data}`;
+  };
+
+  /* =======================================================
+     SAVE ARTICLE TO SUPABASE
+  ======================================================= */
+
+  const saveArticleToSupabase = async (
+    article,
+    imageUrl
+  ) => {
+    try {
+      const userId =
+        session?.user?.id;
+
+      if (!userId) {
+        console.warn(
+          "No authenticated user."
+        );
+        return false;
+      }
+
+      /*
+       * We save the complete structured article
+       * inside content as JSON text.
+       */
+
+      const articleContent =
+        JSON.stringify(article);
+
+      const { error } =
+        await supabase
+          .from("articles")
+          .insert({
+            user_id: userId,
+            title:
+              article.title ||
+              "Untitled Article",
+            content: articleContent,
+            keyword:
+              article.focusKeyword ||
+              articleKeyword,
+            meta_description:
+              article.metaDescription || "",
+            slug:
+              article.slug || "",
+            image_url:
+              imageUrl || null
+          });
+
+      if (error) {
+        console.error(
+          "Supabase article save error:",
+          error
+        );
+
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Article save error:",
+        error
+      );
+
+      return false;
+    }
+  };
+
+  /* =======================================================
      GENERATE ARTICLE
   ======================================================= */
 
   const generateArticle = async () => {
-    if (!articleKeyword.trim() || articleLoading) {
-      setArticleError("Please enter a target keyword.");
+    if (
+      !articleKeyword.trim() ||
+      articleLoading
+    ) {
+      setArticleError(
+        "Please enter a target keyword."
+      );
       return;
     }
 
     setArticleLoading(true);
     setArticleError("");
     setArticleResult(null);
+    setSaved(false);
 
     try {
-      const response = await fetch("/api/article", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          keyword: articleKeyword.trim(),
-          audience: articleAudience,
-          tone: articleTone,
-          length: articleLength,
-          language: articleLanguage,
-
-          /* SEO REQUIREMENTS */
-          seo: {
-            optimized: true,
-            includeTitle: true,
-            includeMetaDescription: true,
-            includeHeadings: true,
-            includeSubheadings: true,
-            includeKeywords: true,
-            includeFaq: true,
-            includeConclusion: true,
-            naturalHumanTone: true
+      const response = await fetch(
+        "/api/article",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
           },
+          body: JSON.stringify({
+            keyword:
+              articleKeyword.trim(),
 
-          /* IMAGE REQUIREMENT */
-          image: {
-            generate: true,
-            relatedToArticle: true,
-            professional: true
-          }
-        })
-      });
+            audience:
+              articleAudience,
 
-      const data = await response.json();
+            tone:
+              articleTone,
+
+            length:
+              articleLength,
+
+            language:
+              articleLanguage,
+
+            seo: {
+              optimized: true,
+              includeTitle: true,
+              includeMetaDescription: true,
+              includeHeadings: true,
+              includeSubheadings: true,
+              includeKeywords: true,
+              includeFaq: true,
+              includeConclusion: true,
+              naturalHumanTone: true
+            },
+
+            image: {
+              generate: true,
+              relatedToArticle: true,
+              professional: true
+            }
+          })
+        }
+      );
+
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -343,92 +478,143 @@ function App() {
       }
 
       /*
-        The following supports different response
-        structures from api/article.js.
-      */
+       * article.js returns:
+       *
+       * {
+       *   success,
+       *   article: {...},
+       *   image: {
+       *     mimeType,
+       *     data
+       *   }
+       * }
+       */
 
       const article =
-        data?.article ||
-        data?.data ||
-        data;
+        data?.article;
 
-      const title =
-        article?.title ||
-        article?.seoTitle ||
-        article?.headline ||
-        "AI Generated Article";
-
-      const content =
-        article?.content ||
-        article?.article ||
-        article?.body ||
-        article?.text ||
-        "";
-
-      const imageUrl =
-        article?.imageUrl ||
-        article?.image_url ||
-        article?.image ||
-        data?.imageUrl ||
-        data?.image_url ||
-        data?.image ||
-        null;
-
-      const metaDescription =
-        article?.metaDescription ||
-        article?.meta_description ||
-        data?.metaDescription ||
-        "";
-
-      const seoScore =
-        article?.seoScore ||
-        article?.seo_score ||
-        data?.seoScore ||
-        null;
-
-      const wordCount =
-        article?.wordCount ||
-        article?.word_count ||
-        content
-          .replace(/[#*_`]/g, "")
-          .split(/\s+/)
-          .filter(Boolean).length;
-
-      if (!content) {
+      if (!article) {
         throw new Error(
-          "AI returned an empty article."
+          "AI returned invalid article data."
         );
       }
 
-      setArticleResult({
-        title,
-        content,
-        imageUrl,
-        metaDescription,
-        keyword:
-          article?.keyword ||
-          article?.targetKeyword ||
+      const imageUrl =
+        convertGeneratedImage(
+          data?.image
+        );
+
+      const normalizedArticle = {
+        ...article,
+        title:
+          article.title ||
+          "AI Generated Article",
+
+        metaDescription:
+          article.metaDescription ||
+          "",
+
+        slug:
+          article.slug ||
+          "",
+
+        focusKeyword:
+          article.focusKeyword ||
           articleKeyword,
-        seoScore,
-        wordCount
-      });
 
-      /* ================================================
-         ADD TO RECENT CONTENT
-      ================================================= */
+        secondaryKeywords:
+          Array.isArray(
+            article.secondaryKeywords
+          )
+            ? article.secondaryKeywords
+            : [],
 
-      setRecentContent((previous) => [
-        {
-          title,
-          date: "Just now",
-          type: "SEO Article",
-          color: "purple"
-        },
-        ...previous
-      ]);
+        searchIntent:
+          article.searchIntent ||
+          "",
+
+        excerpt:
+          article.excerpt ||
+          "",
+
+        introduction:
+          article.introduction ||
+          "",
+
+        sections:
+          Array.isArray(article.sections)
+            ? article.sections
+            : [],
+
+        faq:
+          Array.isArray(article.faq)
+            ? article.faq
+            : [],
+
+        conclusion:
+          article.conclusion ||
+          "",
+
+        imagePrompt:
+          article.imagePrompt ||
+          "",
+
+        wordCount:
+          article.wordCount ||
+          calculateArticleWords(article),
+
+        imageUrl
+      };
+
+      /*
+       * SAVE TO SUPABASE
+       */
+
+      const wasSaved =
+        await saveArticleToSupabase(
+          normalizedArticle,
+          imageUrl
+        );
+
+      setSaved(wasSaved);
+
+      /*
+       * RESULT
+       */
+
+      setArticleResult(
+        normalizedArticle
+      );
+
+      /*
+       * RECENT CONTENT
+       */
+
+      setRecentContent(
+        (previous) => [
+          {
+            title:
+              normalizedArticle.title,
+
+            date:
+              "Just now",
+
+            type:
+              "SEO Article",
+
+            color:
+              "purple"
+          },
+
+          ...previous
+        ]
+      );
 
     } catch (error) {
-      console.error("Article generation error:", error);
+      console.error(
+        "Article generation error:",
+        error
+      );
 
       setArticleError(
         error.message ||
@@ -446,20 +632,15 @@ function App() {
   const copyArticle = async () => {
     if (!articleResult) return;
 
-    const text = [
-      articleResult.title,
-      "",
-      articleResult.metaDescription
-        ? `Meta Description: ${articleResult.metaDescription}`
-        : "",
-      "",
-      articleResult.content
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const text =
+      articleToPlainText(
+        articleResult
+      );
 
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(
+        text
+      );
 
       setCopied(true);
 
@@ -467,8 +648,52 @@ function App() {
         setCopied(false);
       }, 2000);
     } catch (error) {
-      console.error("Copy error:", error);
+      console.error(
+        "Copy error:",
+        error
+      );
     }
+  };
+
+  /* =======================================================
+     DOWNLOAD ARTICLE
+  ======================================================= */
+
+  const downloadArticle = () => {
+    if (!articleResult) return;
+
+    const text =
+      articleToPlainText(
+        articleResult
+      );
+
+    const blob =
+      new Blob(
+        [text],
+        {
+          type:
+            "text/plain;charset=utf-8"
+        }
+      );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      `${articleResult.slug || "article"}.txt`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(url);
   };
 
   /* =======================================================
@@ -479,6 +704,7 @@ function App() {
     setArticleKeyword("");
     setArticleResult(null);
     setArticleError("");
+    setSaved(false);
     setArticleModal(true);
   };
 
@@ -489,24 +715,24 @@ function App() {
   return (
     <div className="app-shell">
 
-      {/* =================================================
-          MOBILE OVERLAY
-      ================================================= */}
+      {/* MOBILE OVERLAY */}
 
       {sidebarOpen && (
         <div
           className="mobile-overlay"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() =>
+            setSidebarOpen(false)
+          }
         />
       )}
 
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
+      {/* SIDEBAR */}
 
       <aside
         className={`sidebar ${
-          sidebarOpen ? "sidebar-open" : ""
+          sidebarOpen
+            ? "sidebar-open"
+            : ""
         }`}
       >
 
@@ -517,13 +743,20 @@ function App() {
           </div>
 
           <div className="brand-text">
-            <strong>AutoPilot AI</strong>
-            <span>AI SOCIAL MANAGER</span>
+            <strong>
+              AutoPilot AI
+            </strong>
+
+            <span>
+              AI SOCIAL MANAGER
+            </span>
           </div>
 
           <button
             className="close-sidebar"
-            onClick={() => setSidebarOpen(false)}
+            onClick={() =>
+              setSidebarOpen(false)
+            }
           >
             <X size={18} />
           </button>
@@ -537,7 +770,9 @@ function App() {
           </div>
 
           <div className="workspace-info">
-            <strong>Faisal's Workspace</strong>
+            <strong>
+              Faisal's Workspace
+            </strong>
 
             <span>
               {session.user?.email ||
@@ -555,72 +790,99 @@ function App() {
 
         <nav className="main-navigation">
 
-          {navigation.map((item) => {
-            const Icon = item.icon;
+          {navigation.map(
+            (item) => {
+              const Icon =
+                item.icon;
 
-            return (
-              <button
-                key={item.name}
-                className={`nav-link ${
-                  activePage === item.name
-                    ? "active"
-                    : ""
-                }`}
-                onClick={() => {
+              return (
+                <button
+                  key={item.name}
+                  className={`nav-link ${
+                    activePage ===
+                    item.name
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => {
 
-                  if (
-                    item.name ===
-                    "AI Command Center"
-                  ) {
-                    setActivePage(item.name);
-                    setSidebarOpen(false);
-                    return;
-                  }
+                    if (
+                      item.name ===
+                      "AI Command Center"
+                    ) {
+                      setActivePage(
+                        item.name
+                      );
+                      setSidebarOpen(
+                        false
+                      );
+                      return;
+                    }
 
-                  if (item.name === "Content") {
-                    setActivePage(item.name);
-                    openArticleGenerator();
-                    setSidebarOpen(false);
-                    return;
-                  }
+                    if (
+                      item.name ===
+                      "Content"
+                    ) {
+                      setActivePage(
+                        item.name
+                      );
 
-                  setActivePage(item.name);
-                  setSidebarOpen(false);
-                }}
-              >
+                      openArticleGenerator();
 
-                <Icon size={17} />
+                      setSidebarOpen(
+                        false
+                      );
 
-                <span>{item.name}</span>
+                      return;
+                    }
 
-                {item.name === "AI Tools" && (
-                  <span className="new-badge">
-                    NEW
+                    setActivePage(
+                      item.name
+                    );
+
+                    setSidebarOpen(
+                      false
+                    );
+                  }}
+                >
+
+                  <Icon size={17} />
+
+                  <span>
+                    {item.name}
                   </span>
-                )}
 
-              </button>
-            );
-          })}
+                  {item.name ===
+                    "AI Tools" && (
+                    <span className="new-badge">
+                      NEW
+                    </span>
+                  )}
+
+                </button>
+              );
+            }
+          )}
 
         </nav>
 
         <div className="sidebar-spacer" />
 
-        {/* =================================================
-            USAGE
-        ================================================= */}
-
         <div className="usage-card">
 
           <div className="usage-header">
-            <span>AI Usage</span>
+            <span>
+              AI Usage
+            </span>
+
             <Zap size={14} />
           </div>
 
           <div className="usage-number">
             23,450{" "}
-            <span>/ 50,000</span>
+            <span>
+              / 50,000
+            </span>
           </div>
 
           <div className="usage-progress">
@@ -628,8 +890,13 @@ function App() {
           </div>
 
           <div className="usage-bottom">
-            <span>46.9% used</span>
-            <span>Tokens</span>
+            <span>
+              46.9% used
+            </span>
+
+            <span>
+              Tokens
+            </span>
           </div>
 
           <button className="upgrade-button">
@@ -638,10 +905,6 @@ function App() {
           </button>
 
         </div>
-
-        {/* =================================================
-            MINI AGENT
-        ================================================= */}
 
         <div className="mini-agent-card">
 
@@ -655,7 +918,8 @@ function App() {
             </strong>
 
             <span>
-              Everything is running smoothly.
+              Everything is running
+              smoothly.
             </span>
           </div>
 
@@ -665,15 +929,11 @@ function App() {
 
       </aside>
 
-      {/* =================================================
-          MAIN AREA
-      ================================================= */}
+      {/* MAIN */}
 
       <main className="main-area">
 
-        {/* =================================================
-            TOPBAR
-        ================================================= */}
+        {/* TOPBAR */}
 
         <header className="topbar">
 
@@ -698,7 +958,9 @@ function App() {
 
             <button
               className="create-button"
-              onClick={quickArticle}
+              onClick={
+                quickArticle
+              }
             >
               <Plus size={17} />
 
@@ -706,7 +968,9 @@ function App() {
                 Create New
               </span>
 
-              <ChevronDown size={14} />
+              <ChevronDown
+                size={14}
+              />
             </button>
 
             <button className="notification-button">
@@ -732,7 +996,9 @@ function App() {
 
               </div>
 
-              <ChevronDown size={15} />
+              <ChevronDown
+                size={15}
+              />
 
             </div>
 
@@ -740,15 +1006,9 @@ function App() {
 
         </header>
 
-        {/* =================================================
-            DASHBOARD
-        ================================================= */}
+        {/* DASHBOARD */}
 
         <div className="dashboard-container">
-
-          {/* =================================================
-              WELCOME
-          ================================================= */}
 
           <section className="welcome-section">
 
@@ -764,33 +1024,38 @@ function App() {
 
               <h1>
                 Good morning, Faisal{" "}
-                <span>👋</span>
+                <span>
+                  👋
+                </span>
               </h1>
 
               <p>
-                Your AI Agent is ready to create,
-                publish and grow your brand.
+                Your AI Agent is ready
+                to create, publish and
+                grow your brand.
               </p>
 
             </div>
 
             <button className="date-selector">
 
-              <CalendarDays size={16} />
+              <CalendarDays
+                size={16}
+              />
 
               <span>
                 August 26, 2026
               </span>
 
-              <ChevronDown size={14} />
+              <ChevronDown
+                size={14}
+              />
 
             </button>
 
           </section>
 
-          {/* =================================================
-              STATS
-          ================================================= */}
+          {/* STATS */}
 
           <section className="stats-grid">
 
@@ -855,7 +1120,9 @@ function App() {
 
             <StatCard
               icon={
-                <BarChart3 size={19} />
+                <BarChart3
+                  size={19}
+                />
               }
               label="Total Reach"
               value="142K"
@@ -874,15 +1141,9 @@ function App() {
 
           </section>
 
-          {/* =================================================
-              PRIMARY GRID
-          ================================================= */}
+          {/* PRIMARY GRID */}
 
           <section className="primary-grid">
-
-            {/* =================================================
-                CONNECTED ACCOUNTS
-            ================================================= */}
 
             <div className="dashboard-card accounts-card">
 
@@ -898,17 +1159,23 @@ function App() {
                   (account) => (
                     <div
                       className="social-account"
-                      key={account.name}
+                      key={
+                        account.name
+                      }
                     >
 
                       <div
                         className={`social-icon ${account.className}`}
                       >
-                        {account.icon}
+                        {
+                          account.icon
+                        }
                       </div>
 
                       <strong>
-                        {account.name}
+                        {
+                          account.name
+                        }
                       </strong>
 
                       <span className="connected-status">
@@ -926,22 +1193,23 @@ function App() {
 
                 <Plus size={14} />
 
-                Connect another account
+                Connect another
+                account
 
               </button>
 
             </div>
 
-            {/* =================================================
-                AI COMMAND CENTER
-            ================================================= */}
+            {/* AI COMMAND */}
 
             <div className="dashboard-card command-card">
 
               <div className="command-header">
 
                 <div className="ai-command-icon">
-                  <Sparkles size={18} />
+                  <Sparkles
+                    size={18}
+                  />
                 </div>
 
                 <div>
@@ -950,8 +1218,8 @@ function App() {
                   </h3>
 
                   <p>
-                    Tell your agent what you
-                    want to accomplish.
+                    Tell your agent what
+                    you want to accomplish.
                   </p>
                 </div>
 
@@ -979,7 +1247,9 @@ function App() {
 
                   <span>
 
-                    <WandSparkles size={13} />
+                    <WandSparkles
+                      size={13}
+                    />
 
                     AI Agent can research,
                     write, design & publish
@@ -987,7 +1257,8 @@ function App() {
                   </span>
 
                   <span>
-                    {command.length}/500
+                    {command.length}
+                    /500
                   </span>
 
                 </div>
@@ -997,9 +1268,13 @@ function App() {
               <div className="quick-actions">
 
                 <button
-                  onClick={quickArticle}
+                  onClick={
+                    quickArticle
+                  }
                 >
-                  <PenLine size={14} />
+                  <PenLine
+                    size={14}
+                  />
                   Write Article
                 </button>
 
@@ -1010,7 +1285,9 @@ function App() {
                     );
                   }}
                 >
-                  <ImagePlus size={14} />
+                  <ImagePlus
+                    size={14}
+                  />
                   Create Image
                 </button>
 
@@ -1021,7 +1298,9 @@ function App() {
                     );
                   }}
                 >
-                  <Share2 size={14} />
+                  <Share2
+                    size={14}
+                  />
                   Social Campaign
                 </button>
 
@@ -1032,7 +1311,9 @@ function App() {
                     );
                   }}
                 >
-                  <Search size={14} />
+                  <Search
+                    size={14}
+                  />
                   Research Topic
                 </button>
 
@@ -1044,7 +1325,9 @@ function App() {
                     ? "running"
                     : ""
                 }`}
-                onClick={runAgent}
+                onClick={
+                  runAgent
+                }
               >
 
                 {agentRunning ? (
@@ -1054,7 +1337,9 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} />
+                    <Sparkles
+                      size={16}
+                    />
                     Run AI Agent
                     <ArrowUpRight
                       size={15}
@@ -1068,15 +1353,9 @@ function App() {
 
           </section>
 
-          {/* =================================================
-              LOWER GRID
-          ================================================= */}
+          {/* LOWER GRID */}
 
           <section className="secondary-grid">
-
-            {/* =================================================
-                RECENT CONTENT
-            ================================================= */}
 
             <div className="dashboard-card content-card">
 
@@ -1091,7 +1370,10 @@ function App() {
                 {recentContent
                   .slice(0, 5)
                   .map(
-                    (item, index) => (
+                    (
+                      item,
+                      index
+                    ) => (
                       <div
                         className="content-item"
                         key={`${item.title}-${index}`}
@@ -1101,28 +1383,32 @@ function App() {
                           className={`content-thumbnail ${item.color}`}
                         >
 
-                          {index % 4 ===
+                          {index %
+                            4 ===
                             0 && (
                             <FileText
                               size={17}
                             />
                           )}
 
-                          {index % 4 ===
+                          {index %
+                            4 ===
                             1 && (
                             <Send
                               size={17}
                             />
                           )}
 
-                          {index % 4 ===
+                          {index %
+                            4 ===
                             2 && (
                             <Sparkles
                               size={17}
                             />
                           )}
 
-                          {index % 4 ===
+                          {index %
+                            4 ===
                             3 && (
                             <Globe
                               size={17}
@@ -1134,12 +1420,19 @@ function App() {
                         <div className="content-details">
 
                           <strong>
-                            {item.title}
+                            {
+                              item.title
+                            }
                           </strong>
 
                           <span>
-                            {item.date} •{" "}
-                            {item.type}
+                            {
+                              item.date
+                            }{" "}
+                            •{" "}
+                            {
+                              item.type
+                            }
                           </span>
 
                         </div>
@@ -1168,17 +1461,17 @@ function App() {
 
               <button
                 className="view-all-button"
-                onClick={openArticleGenerator}
+                onClick={
+                  openArticleGenerator
+                }
               >
                 View all content
-                <ArrowUpRight size={14} />
+                <ArrowUpRight
+                  size={14}
+                />
               </button>
 
             </div>
-
-            {/* =================================================
-                CALENDAR
-            ================================================= */}
 
             <div className="dashboard-card calendar-card">
 
@@ -1193,23 +1486,39 @@ function App() {
               <div className="calendar-summary">
 
                 <div>
-                  <strong>8</strong>
-                  <span>Articles</span>
+                  <strong>
+                    8
+                  </strong>
+                  <span>
+                    Articles
+                  </span>
                 </div>
 
                 <div>
-                  <strong>15</strong>
-                  <span>Social Posts</span>
+                  <strong>
+                    15
+                  </strong>
+                  <span>
+                    Social Posts
+                  </span>
                 </div>
 
                 <div>
-                  <strong>3</strong>
-                  <span>Scheduled</span>
+                  <strong>
+                    3
+                  </strong>
+                  <span>
+                    Scheduled
+                  </span>
                 </div>
 
                 <div>
-                  <strong>2</strong>
-                  <span>Drafts</span>
+                  <strong>
+                    2
+                  </strong>
+                  <span>
+                    Drafts
+                  </span>
                 </div>
 
               </div>
@@ -1218,9 +1527,7 @@ function App() {
 
           </section>
 
-          {/* =================================================
-              AGENT STATUS
-          ================================================= */}
+          {/* AGENT STATUS */}
 
           <section className="agent-status-card">
 
@@ -1239,14 +1546,17 @@ function App() {
                     Your AI Agent is Active
                   </strong>
 
-                  <span>●</span>
+                  <span>
+                    ●
+                  </span>
 
                 </div>
 
                 <p>
                   AutoPilot is monitoring
-                  your schedule and preparing
-                  your next content campaign.
+                  your schedule and
+                  preparing your next
+                  content campaign.
                 </p>
 
               </div>
@@ -1273,7 +1583,9 @@ function App() {
 
             <div className="agent-task">
 
-              <FileText size={17} />
+              <FileText
+                size={17}
+              />
 
               <div>
 
@@ -1305,35 +1617,67 @@ function App() {
 
       </main>
 
-      {/* =====================================================
-          ARTICLE GENERATOR MODAL
-      ===================================================== */}
+      {/* ARTICLE MODAL */}
 
       {articleModal && (
         <ArticleModal
           keyword={articleKeyword}
-          setKeyword={setArticleKeyword}
-          audience={articleAudience}
-          setAudience={setArticleAudience}
+          setKeyword={
+            setArticleKeyword
+          }
+          audience={
+            articleAudience
+          }
+          setAudience={
+            setArticleAudience
+          }
           tone={articleTone}
           setTone={setArticleTone}
           length={articleLength}
-          setLength={setArticleLength}
-          language={articleLanguage}
-          setLanguage={setArticleLanguage}
-          loading={articleLoading}
-          error={articleError}
-          result={articleResult}
+          setLength={
+            setArticleLength
+          }
+          language={
+            articleLanguage
+          }
+          setLanguage={
+            setArticleLanguage
+          }
+          loading={
+            articleLoading
+          }
+          error={
+            articleError
+          }
+          result={
+            articleResult
+          }
           copied={copied}
-          onGenerate={generateArticle}
-          onCopy={copyArticle}
+          saved={saved}
+          onGenerate={
+            generateArticle
+          }
+          onCopy={
+            copyArticle
+          }
+          onDownload={
+            downloadArticle
+          }
           onClose={() => {
-            if (!articleLoading) {
-              setArticleModal(false);
-              setArticleError("");
+            if (
+              !articleLoading
+            ) {
+              setArticleModal(
+                false
+              );
+              setArticleError(
+                ""
+              );
             }
           }}
-          onRegenerate={generateArticle}
+          onRegenerate={
+            generateArticle
+          }
         />
       )}
 
@@ -1360,8 +1704,10 @@ function ArticleModal({
   error,
   result,
   copied,
+  saved,
   onGenerate,
   onCopy,
+  onDownload,
   onClose,
   onRegenerate
 }) {
@@ -1376,16 +1722,16 @@ function ArticleModal({
         }`}
       >
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {/* HEADER */}
 
         <div className="article-modal-header">
 
           <div className="article-modal-title">
 
             <div className="article-ai-icon">
-              <Sparkles size={22} />
+              <Sparkles
+                size={22}
+              />
             </div>
 
             <div>
@@ -1414,7 +1760,9 @@ function ArticleModal({
 
           <button
             className="modal-close"
-            onClick={onClose}
+            onClick={
+              onClose
+            }
             disabled={loading}
           >
             <X size={20} />
@@ -1422,350 +1770,389 @@ function ArticleModal({
 
         </div>
 
-        {/* =================================================
-            ERROR
-        ================================================= */}
+        {/* ERROR */}
 
         {error && (
           <div className="article-error">
             <X size={16} />
-            <span>{error}</span>
+            <span>
+              {error}
+            </span>
           </div>
         )}
 
-        {/* =================================================
-            GENERATOR FORM
-        ================================================= */}
+        {/* FORM */}
 
-        {!result && !loading && (
-          <div className="article-generator">
+        {!result &&
+          !loading && (
+            <div className="article-generator">
 
-            <div className="generator-hero">
+              <div className="generator-hero">
 
-              <div className="generator-hero-icon">
-                <PenLine size={24} />
-              </div>
-
-              <div>
-                <h3>
-                  What do you want to
-                  write about?
-                </h3>
-
-                <p>
-                  Enter your target keyword
-                  and AutoPilot will handle
-                  research, SEO, structure,
-                  writing and image generation.
-                </p>
-              </div>
-
-            </div>
-
-            <label className="form-label">
-              <span>
-                Target Keyword
-              </span>
-
-              <small>
-                Main keyword
-              </small>
-            </label>
-
-            <div className="keyword-input">
-
-              <Search size={18} />
-
-              <input
-                value={keyword}
-                onChange={(e) =>
-                  setKeyword(
-                    e.target.value
-                  )
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter"
-                  ) {
-                    onGenerate();
-                  }
-                }}
-                placeholder="e.g. best AI tools for small businesses"
-              />
-
-            </div>
-
-            <div className="generator-options">
-
-              <div className="form-group">
-
-                <label>
-                  Audience
-                </label>
-
-                <select
-                  value={audience}
-                  onChange={(e) =>
-                    setAudience(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option>
-                    General audience
-                  </option>
-
-                  <option>
-                    Business owners
-                  </option>
-
-                  <option>
-                    Entrepreneurs
-                  </option>
-
-                  <option>
-                    Marketers
-                  </option>
-
-                  <option>
-                    Beginners
-                  </option>
-
-                  <option>
-                    Professionals
-                  </option>
-                </select>
-
-              </div>
-
-              <div className="form-group">
-
-                <label>
-                  Tone
-                </label>
-
-                <select
-                  value={tone}
-                  onChange={(e) =>
-                    setTone(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option>
-                    Professional
-                  </option>
-
-                  <option>
-                    Friendly
-                  </option>
-
-                  <option>
-                    Conversational
-                  </option>
-
-                  <option>
-                    Expert
-                  </option>
-
-                  <option>
-                    Persuasive
-                  </option>
-                </select>
-
-              </div>
-
-              <div className="form-group">
-
-                <label>
-                  Article Length
-                </label>
-
-                <select
-                  value={length}
-                  onChange={(e) =>
-                    setLength(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option>
-                    Short
-                  </option>
-
-                  <option>
-                    Medium
-                  </option>
-
-                  <option>
-                    Long
-                  </option>
-
-                  <option>
-                    Comprehensive
-                  </option>
-                </select>
-
-              </div>
-
-              <div className="form-group">
-
-                <label>
-                  Language
-                </label>
-
-                <select
-                  value={language}
-                  onChange={(e) =>
-                    setLanguage(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option>
-                    English
-                  </option>
-
-                  <option>
-                    Urdu
-                  </option>
-
-                  <option>
-                    Roman Urdu
-                  </option>
-                </select>
-
-              </div>
-
-            </div>
-
-            {/* SEO FEATURES */}
-
-            <div className="seo-feature-box">
-
-              <div className="seo-feature-header">
-
-                <div className="seo-feature-icon">
-                  <Target size={17} />
+                <div className="generator-hero-icon">
+                  <PenLine
+                    size={24}
+                  />
                 </div>
 
                 <div>
-                  <strong>
-                    Full SEO Optimization
-                  </strong>
+                  <h3>
+                    What do you want to
+                    write about?
+                  </h3>
 
-                  <span>
-                    AutoPilot will optimize
-                    the entire article
-                  </span>
+                  <p>
+                    Enter your target
+                    keyword and
+                    AutoPilot will handle
+                    SEO, structure,
+                    writing and image
+                    generation.
+                  </p>
                 </div>
 
-                <Check
+              </div>
+
+              <label className="form-label">
+
+                <span>
+                  Target Keyword
+                </span>
+
+                <small>
+                  Main keyword
+                </small>
+
+              </label>
+
+              <div className="keyword-input">
+
+                <Search
                   size={18}
-                  className="seo-check"
+                />
+
+                <input
+                  value={
+                    keyword
+                  }
+                  onChange={(e) =>
+                    setKeyword(
+                      e.target.value
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (
+                      e.key ===
+                      "Enter"
+                    ) {
+                      onGenerate();
+                    }
+                  }}
+                  placeholder="e.g. best AI tools for small businesses"
                 />
 
               </div>
 
-              <div className="seo-feature-list">
+              <div className="generator-options">
 
-                <span>
-                  <Check size={13} />
-                  SEO Title
-                </span>
+                <div className="form-group">
 
-                <span>
-                  <Check size={13} />
-                  Meta Description
-                </span>
+                  <label>
+                    Audience
+                  </label>
 
-                <span>
-                  <Check size={13} />
-                  H1 / H2 / H3 Structure
-                </span>
+                  <select
+                    value={
+                      audience
+                    }
+                    onChange={(e) =>
+                      setAudience(
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option>
+                      General audience
+                    </option>
 
-                <span>
-                  <Check size={13} />
-                  Keyword Optimization
-                </span>
+                    <option>
+                      Business owners
+                    </option>
 
-                <span>
-                  <Check size={13} />
-                  FAQ Section
-                </span>
+                    <option>
+                      Entrepreneurs
+                    </option>
 
-                <span>
-                  <Check size={13} />
-                  Human Tone
-                </span>
+                    <option>
+                      Marketers
+                    </option>
+
+                    <option>
+                      Beginners
+                    </option>
+
+                    <option>
+                      Professionals
+                    </option>
+                  </select>
+
+                </div>
+
+                <div className="form-group">
+
+                  <label>
+                    Tone
+                  </label>
+
+                  <select
+                    value={tone}
+                    onChange={(e) =>
+                      setTone(
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option>
+                      Professional
+                    </option>
+
+                    <option>
+                      Friendly
+                    </option>
+
+                    <option>
+                      Conversational
+                    </option>
+
+                    <option>
+                      Expert
+                    </option>
+
+                    <option>
+                      Persuasive
+                    </option>
+                  </select>
+
+                </div>
+
+                <div className="form-group">
+
+                  <label>
+                    Article Length
+                  </label>
+
+                  <select
+                    value={length}
+                    onChange={(e) =>
+                      setLength(
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option>
+                      Short
+                    </option>
+
+                    <option>
+                      Medium
+                    </option>
+
+                    <option>
+                      Long
+                    </option>
+
+                    <option>
+                      Comprehensive
+                    </option>
+                  </select>
+
+                </div>
+
+                <div className="form-group">
+
+                  <label>
+                    Language
+                  </label>
+
+                  <select
+                    value={
+                      language
+                    }
+                    onChange={(e) =>
+                      setLanguage(
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option>
+                      English
+                    </option>
+
+                    <option>
+                      Urdu
+                    </option>
+
+                    <option>
+                      Roman Urdu
+                    </option>
+                  </select>
+
+                </div>
 
               </div>
+
+              {/* SEO */}
+
+              <div className="seo-feature-box">
+
+                <div className="seo-feature-header">
+
+                  <div className="seo-feature-icon">
+                    <Target
+                      size={17}
+                    />
+                  </div>
+
+                  <div>
+                    <strong>
+                      Full SEO Optimization
+                    </strong>
+
+                    <span>
+                      Complete on-page SEO
+                      package
+                    </span>
+                  </div>
+
+                  <Check
+                    size={18}
+                    className="seo-check"
+                  />
+
+                </div>
+
+                <div className="seo-feature-list">
+
+                  <span>
+                    <Check size={13} />
+                    SEO Title
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    Meta Description
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    URL Slug
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    H1 / H2 / H3
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    Focus Keyword
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    Semantic Keywords
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    FAQ Schema Content
+                  </span>
+
+                  <span>
+                    <Check size={13} />
+                    Human Tone
+                  </span>
+
+                </div>
+
+              </div>
+
+              {/* IMAGE */}
+
+              <div className="image-feature-box">
+
+                <div className="image-feature-icon">
+                  <ImagePlus
+                    size={18}
+                  />
+                </div>
+
+                <div>
+
+                  <strong>
+                    AI Featured Image
+                  </strong>
+
+                  <span>
+                    Generate a custom
+                    image related to the
+                    article
+                  </span>
+
+                </div>
+
+                <div className="feature-on">
+                  ON
+                </div>
+
+              </div>
+
+              <button
+                className="generate-article-button"
+                onClick={
+                  onGenerate
+                }
+              >
+
+                <Sparkles
+                  size={18}
+                />
+
+                Generate Professional
+                Article
+
+                <ArrowUpRight
+                  size={17}
+                />
+
+              </button>
 
             </div>
+          )}
 
-            {/* IMAGE */}
-
-            <div className="image-feature-box">
-
-              <div className="image-feature-icon">
-                <ImagePlus size={18} />
-              </div>
-
-              <div>
-
-                <strong>
-                  AI Featured Image
-                </strong>
-
-                <span>
-                  Generate a professional
-                  image related to your article
-                </span>
-
-              </div>
-
-              <div className="feature-on">
-                ON
-              </div>
-
-            </div>
-
-            <button
-              className="generate-article-button"
-              onClick={onGenerate}
-            >
-
-              <Sparkles size={18} />
-
-              Generate Professional Article
-
-              <ArrowUpRight size={17} />
-
-            </button>
-
-          </div>
-        )}
-
-        {/* =================================================
-            LOADING
-        ================================================= */}
+        {/* LOADING */}
 
         {loading && (
           <ArticleGenerating />
         )}
 
-        {/* =================================================
-            RESULT
-        ================================================= */}
+        {/* RESULT */}
 
-        {result && !loading && (
-          <ArticleResult
-            result={result}
-            copied={copied}
-            onCopy={onCopy}
-            onRegenerate={onRegenerate}
-          />
-        )}
+        {result &&
+          !loading && (
+            <ArticleResult
+              result={result}
+              copied={copied}
+              saved={saved}
+              onCopy={onCopy}
+              onDownload={
+                onDownload
+              }
+              onRegenerate={
+                onRegenerate
+              }
+            />
+          )}
 
       </div>
 
@@ -1774,7 +2161,7 @@ function ArticleModal({
 }
 
 /* =========================================================
-   ARTICLE GENERATING SCREEN
+   GENERATING
 ========================================================= */
 
 function ArticleGenerating() {
@@ -1783,7 +2170,9 @@ function ArticleGenerating() {
 
       <div className="generating-orb">
         <div>
-          <Sparkles size={32} />
+          <Sparkles
+            size={32}
+          />
         </div>
       </div>
 
@@ -1793,9 +2182,9 @@ function ArticleGenerating() {
       </h2>
 
       <p>
-        Researching topic, building
-        SEO structure, writing content
-        and generating your featured image.
+        Building SEO structure,
+        writing the article and
+        generating your featured image.
       </p>
 
       <div className="generation-steps">
@@ -1804,6 +2193,7 @@ function ArticleGenerating() {
           <div>
             <Check size={14} />
           </div>
+
           <span>
             Analyzing keyword
           </span>
@@ -1813,6 +2203,7 @@ function ArticleGenerating() {
           <div>
             <Check size={14} />
           </div>
+
           <span>
             Building SEO structure
           </span>
@@ -1825,8 +2216,9 @@ function ArticleGenerating() {
               className="spin"
             />
           </div>
+
           <span>
-            Writing human-quality article
+            Writing article
           </span>
         </div>
 
@@ -1841,9 +2233,9 @@ function ArticleGenerating() {
 
       <div className="generation-note">
         <Zap size={14} />
-        This may take a little while
-        because AutoPilot is creating
-        the complete SEO package.
+
+        AutoPilot is creating
+        your complete SEO package.
       </div>
 
     </div>
@@ -1857,54 +2249,100 @@ function ArticleGenerating() {
 function ArticleResult({
   result,
   copied,
+  saved,
   onCopy,
+  onDownload,
   onRegenerate
 }) {
-  const formattedContent = useMemo(() => {
-    return formatArticleContent(
-      result.content
-    );
-  }, [result.content]);
+  const article =
+    normalizeArticle(result);
 
   return (
     <div className="article-result">
 
       {/* =================================================
-          RESULT TOP
+          PROFESSIONAL ARTICLE HERO
       ================================================= */}
 
-      <div className="article-result-top">
+      <div className="article-document">
 
-        <div>
+        <div className="article-top-bar">
 
-          <div className="result-status">
-            <CheckCircle2 size={15} />
-            Article generated successfully
+          <div className="article-brand-small">
+            <Sparkles
+              size={14}
+            />
+
+            AutoPilot AI
           </div>
 
-          <h1>
-            {result.title}
+          <div className="article-status-right">
+
+            {saved && (
+              <span className="saved-badge">
+                <CheckCircle2
+                  size={13}
+                />
+                Saved
+              </span>
+            )}
+
+            <span className="publication-badge">
+              <CheckCircle2
+                size={13}
+              />
+              Publication Ready
+            </span>
+
+          </div>
+
+        </div>
+
+        {/* SEO HEADER */}
+
+        <div className="article-document-header">
+
+          <div className="article-category">
+            SEO ARTICLE
+          </div>
+
+          <h1 className="professional-article-title">
+            {article.title}
           </h1>
 
-          <div className="article-meta-row">
+          {article.excerpt && (
+            <p className="article-excerpt">
+              {article.excerpt}
+            </p>
+          )}
+
+          <div className="professional-meta">
 
             <span>
-              <Target size={14} />
-              {result.keyword ||
-                "Target keyword"}
+              <Target
+                size={14}
+              />
+
+              {article.focusKeyword}
             </span>
 
             <span>
-              <AlignLeft size={14} />
-              {result.wordCount || 0}
+              <AlignLeft
+                size={14}
+              />
+
+              {article.wordCount}
               {" "}
               words
             </span>
 
-            {result.seoScore && (
-              <span className="seo-score">
-                <CheckCircle2 size={14} />
-                SEO {result.seoScore}
+            {article.searchIntent && (
+              <span>
+                <Search
+                  size={14}
+                />
+
+                {article.searchIntent}
               </span>
             )}
 
@@ -1912,134 +2350,356 @@ function ArticleResult({
 
         </div>
 
-        <button
-          className="regenerate-button"
-          onClick={onRegenerate}
-        >
-          <RefreshCw size={15} />
-          Regenerate
-        </button>
+        {/* FEATURED IMAGE */}
 
-      </div>
+        {article.imageUrl ? (
+          <div className="professional-featured-image">
 
-      {/* =================================================
-          FEATURED IMAGE
-      ================================================= */}
+            <img
+              src={
+                article.imageUrl
+              }
+              alt={
+                article.title
+              }
+            />
 
-      {result.imageUrl && (
-        <div className="article-featured-image">
+            <div className="featured-image-badge">
+              <ImageIcon
+                size={14}
+              />
 
-          <img
-            src={result.imageUrl}
-            alt={
-              result.title ||
-              "AI generated article image"
-            }
-          />
-
-          <div className="image-overlay-label">
-            <ImageIcon size={14} />
-            AI Generated Featured Image
-          </div>
-
-        </div>
-      )}
-
-      {/* =================================================
-          SEO SUMMARY
-      ================================================= */}
-
-      {result.metaDescription && (
-        <div className="seo-preview">
-
-          <div className="seo-preview-header">
-
-            <div>
-              <Target size={16} />
-              SEO Meta Description
+              AI Generated Featured Image
             </div>
 
-            <span>
-              {result.metaDescription.length}
-              /160
-            </span>
-
           </div>
+        ) : (
+          <div className="image-missing-box">
 
-          <p>
-            {result.metaDescription}
-          </p>
+            <ImageIcon
+              size={30}
+            />
 
-        </div>
-      )}
-
-      {/* =================================================
-          ARTICLE BODY
-      ================================================= */}
-
-      <div className="article-body">
-
-        {formattedContent}
-
-      </div>
-
-      {/* =================================================
-          RESULT FOOTER
-      ================================================= */}
-
-      <div className="article-result-footer">
-
-        <div className="article-generated-by">
-
-          <div className="small-ai-icon">
-            <Sparkles size={14} />
-          </div>
-
-          <div>
             <strong>
-              Generated by AutoPilot AI
+              Featured image unavailable
             </strong>
 
             <span>
-              SEO optimized • Human tone •
-              AI featured image
+              The article was generated,
+              but the image API did not
+              return an image.
             </span>
+
           </div>
+        )}
+
+        {/* SEO PANEL */}
+
+        <div className="seo-dashboard">
+
+          <div className="seo-dashboard-title">
+            <Target size={17} />
+            SEO Optimization
+          </div>
+
+          <div className="seo-grid">
+
+            <div className="seo-item">
+
+              <span>
+                SEO TITLE
+              </span>
+
+              <strong>
+                {article.title}
+              </strong>
+
+            </div>
+
+            <div className="seo-item">
+
+              <span>
+                META DESCRIPTION
+              </span>
+
+              <strong>
+                {article.metaDescription}
+              </strong>
+
+              <small>
+                {
+                  article
+                    .metaDescription
+                    .length
+                }
+                /160
+              </small>
+
+            </div>
+
+            <div className="seo-item">
+
+              <span>
+                URL SLUG
+              </span>
+
+              <strong>
+                /{article.slug}
+              </strong>
+
+            </div>
+
+            <div className="seo-item">
+
+              <span>
+                FOCUS KEYWORD
+              </span>
+
+              <strong>
+                {article.focusKeyword}
+              </strong>
+
+            </div>
+
+          </div>
+
+          {article.secondaryKeywords
+            .length > 0 && (
+            <div className="keyword-list">
+
+              <span>
+                Secondary Keywords
+              </span>
+
+              <div>
+
+                {article.secondaryKeywords.map(
+                  (
+                    keyword,
+                    index
+                  ) => (
+                    <span
+                      key={
+                        index
+                      }
+                      className="keyword-pill"
+                    >
+                      <Hash
+                        size={11}
+                      />
+
+                      {keyword}
+                    </span>
+                  )
+                )}
+
+              </div>
+
+            </div>
+          )}
 
         </div>
 
-        <div className="article-actions">
+        {/* ARTICLE CONTENT */}
 
-          <button
-            className="copy-article-button"
-            onClick={onCopy}
-          >
+        <article className="professional-article-content">
 
-            {copied ? (
-              <>
-                <Check size={16} />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy size={16} />
-                Copy Article
-              </>
-            )}
+          {/* INTRODUCTION */}
 
-          </button>
+          {article.introduction && (
+            <section className="article-introduction">
 
-          <button className="done-article-button">
+              <div className="section-label">
+                INTRODUCTION
+              </div>
 
-            <Check size={16} />
+              <p className="lead-paragraph">
+                {
+                  article.introduction
+                }
+              </p>
 
-            Done
+            </section>
+          )}
 
-            <ArrowUpRight
-              size={15}
-            />
+          {/* SECTIONS */}
 
-          </button>
+          {article.sections.map(
+            (
+              section,
+              sectionIndex
+            ) => (
+              <ArticleSection
+                key={
+                  sectionIndex
+                }
+                section={
+                  section
+                }
+              />
+            )
+          )}
+
+          {/* FAQ */}
+
+          {article.faq.length >
+            0 && (
+            <section className="article-faq">
+
+              <div className="section-label">
+                FREQUENTLY ASKED QUESTIONS
+              </div>
+
+              <h2>
+                Frequently Asked
+                Questions
+              </h2>
+
+              {article.faq.map(
+                (
+                  item,
+                  index
+                ) => (
+                  <div
+                    className="faq-item"
+                    key={
+                      index
+                    }
+                  >
+
+                    <h3>
+                      <span>
+                        Q
+                      </span>
+
+                      {
+                        item.question
+                      }
+                    </h3>
+
+                    <p>
+                      {
+                        item.answer
+                      }
+                    </p>
+
+                  </div>
+                )
+              )}
+
+            </section>
+          )}
+
+          {/* CONCLUSION */}
+
+          {article.conclusion && (
+            <section className="article-conclusion">
+
+              <div className="section-label">
+                CONCLUSION
+              </div>
+
+              <h2>
+                Conclusion
+              </h2>
+
+              <p>
+                {
+                  article.conclusion
+                }
+              </p>
+
+            </section>
+          )}
+
+        </article>
+
+        {/* ARTICLE FOOTER */}
+
+        <div className="article-document-footer">
+
+          <div className="article-generated-by">
+
+            <div className="small-ai-icon">
+              <Sparkles
+                size={14}
+              />
+            </div>
+
+            <div>
+
+              <strong>
+                Generated by AutoPilot AI
+              </strong>
+
+              <span>
+                SEO optimized •
+                Human-quality writing •
+                AI featured image
+              </span>
+
+            </div>
+
+          </div>
+
+          <div className="article-actions">
+
+            <button
+              className="copy-article-button"
+              onClick={
+                onCopy
+              }
+            >
+
+              {copied ? (
+                <>
+                  <Check
+                    size={16}
+                  />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy
+                    size={16}
+                  />
+                  Copy Article
+                </>
+              )}
+
+            </button>
+
+            <button
+              className="download-article-button"
+              onClick={
+                onDownload
+              }
+            >
+
+              <Download
+                size={16}
+              />
+
+              Download
+
+            </button>
+
+            <button
+              className="regenerate-button"
+              onClick={
+                onRegenerate
+              }
+            >
+
+              <RefreshCw
+                size={15}
+              />
+
+              Regenerate
+
+            </button>
+
+          </div>
 
         </div>
 
@@ -2050,170 +2710,487 @@ function ArticleResult({
 }
 
 /* =========================================================
-   ARTICLE MARKDOWN FORMATTER
+   ARTICLE SECTION
 ========================================================= */
 
-function formatArticleContent(content) {
-  if (!content) return null;
+function ArticleSection({
+  section
+}) {
+  if (!section) return null;
 
-  const lines = content.split("\n");
+  return (
+    <section className="article-section">
 
-  return lines.map((line, index) => {
-
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      return (
-        <div
-          key={index}
-          className="article-spacer"
-        />
-      );
-    }
-
-    /* H1 */
-
-    if (
-      trimmed.startsWith("# ") &&
-      !trimmed.startsWith("## ")
-    ) {
-      return (
-        <h1 key={index}>
-          {renderInlineMarkdown(
-            trimmed.replace(/^# /, "")
-          )}
-        </h1>
-      );
-    }
-
-    /* H2 */
-
-    if (
-      trimmed.startsWith("## ") &&
-      !trimmed.startsWith("### ")
-    ) {
-      return (
-        <h2 key={index}>
-          {renderInlineMarkdown(
-            trimmed.replace(/^## /, "")
-          )}
+      {section.heading && (
+        <h2>
+          {section.heading}
         </h2>
-      );
-    }
+      )}
 
-    /* H3 */
+      {Array.isArray(
+        section.paragraphs
+      ) &&
+        section.paragraphs.map(
+          (
+            paragraph,
+            index
+          ) => (
+            <p key={index}>
+              {paragraph}
+            </p>
+          )
+        )}
 
-    if (trimmed.startsWith("### ")) {
-      return (
-        <h3 key={index}>
-          {renderInlineMarkdown(
-            trimmed.replace(/^### /, "")
-          )}
-        </h3>
-      );
-    }
+      {Array.isArray(
+        section.bullets
+      ) &&
+        section.bullets.length >
+          0 && (
+          <ul className="article-bullet-list">
 
-    /* BULLET */
+            {section.bullets.map(
+              (
+                bullet,
+                index
+              ) => (
+                <li
+                  key={
+                    index
+                  }
+                >
+                  <span className="bullet-check">
+                    <Check
+                      size={13}
+                    />
+                  </span>
 
-    if (
-      trimmed.startsWith("- ") ||
-      trimmed.startsWith("* ")
-    ) {
-      return (
-        <li key={index}>
-          {renderInlineMarkdown(
-            trimmed.substring(2)
-          )}
-        </li>
-      );
-    }
+                  <span>
+                    {bullet}
+                  </span>
+                </li>
+              )
+            )}
 
-    /* NUMBERED */
+          </ul>
+        )}
 
-    if (/^\d+\.\s/.test(trimmed)) {
-      return (
-        <li
-          key={index}
-          className="numbered-article-item"
-        >
-          {renderInlineMarkdown(
-            trimmed.replace(
-              /^\d+\.\s/,
-              ""
-            )
-          )}
-        </li>
-      );
-    }
+      {Array.isArray(
+        section.subsections
+      ) &&
+        section.subsections.map(
+          (
+            subsection,
+            index
+          ) => (
+            <div
+              className="article-subsection"
+              key={
+                index
+              }
+            >
 
-    /* QUOTE */
+              {subsection.heading && (
+                <h3>
+                  {
+                    subsection.heading
+                  }
+                </h3>
+              )}
 
-    if (trimmed.startsWith("> ")) {
-      return (
-        <blockquote key={index}>
-          {renderInlineMarkdown(
-            trimmed.replace(/^> /, "")
-          )}
-        </blockquote>
-      );
-    }
+              {Array.isArray(
+                subsection.paragraphs
+              ) &&
+                subsection.paragraphs.map(
+                  (
+                    paragraph,
+                    paragraphIndex
+                  ) => (
+                    <p
+                      key={
+                        paragraphIndex
+                      }
+                    >
+                      {
+                        paragraph
+                      }
+                    </p>
+                  )
+                )}
 
-    /* NORMAL PARAGRAPH */
+              {Array.isArray(
+                subsection.bullets
+              ) &&
+                subsection.bullets
+                  .length >
+                  0 && (
+                  <ul className="article-bullet-list">
 
-    return (
-      <p key={index}>
-        {renderInlineMarkdown(trimmed)}
-      </p>
-    );
-  });
+                    {subsection.bullets.map(
+                      (
+                        bullet,
+                        bulletIndex
+                      ) => (
+                        <li
+                          key={
+                            bulletIndex
+                          }
+                        >
+
+                          <span className="bullet-check">
+                            <Check
+                              size={13}
+                            />
+                          </span>
+
+                          <span>
+                            {
+                              bullet
+                            }
+                          </span>
+
+                        </li>
+                      )
+                    )}
+
+                  </ul>
+                )}
+
+            </div>
+          )
+        )}
+
+    </section>
+  );
 }
 
 /* =========================================================
-   INLINE MARKDOWN
+   NORMALIZE ARTICLE
 ========================================================= */
 
-function renderInlineMarkdown(text) {
-  const parts = text.split(
-    /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g
+function normalizeArticle(
+  article
+) {
+  return {
+    title:
+      article?.title ||
+      "AI Generated Article",
+
+    metaDescription:
+      article?.metaDescription ||
+      "",
+
+    slug:
+      article?.slug ||
+      "",
+
+    focusKeyword:
+      article?.focusKeyword ||
+      article?.keyword ||
+      "",
+
+    secondaryKeywords:
+      Array.isArray(
+        article?.secondaryKeywords
+      )
+        ? article.secondaryKeywords
+        : [],
+
+    searchIntent:
+      article?.searchIntent ||
+      "",
+
+    excerpt:
+      article?.excerpt ||
+      "",
+
+    introduction:
+      article?.introduction ||
+      "",
+
+    sections:
+      Array.isArray(
+        article?.sections
+      )
+        ? article.sections
+        : [],
+
+    faq:
+      Array.isArray(
+        article?.faq
+      )
+        ? article.faq
+        : [],
+
+    conclusion:
+      article?.conclusion ||
+      "",
+
+    wordCount:
+      article?.wordCount ||
+      calculateArticleWords(
+        article
+      ),
+
+    imageUrl:
+      article?.imageUrl ||
+      null
+  };
+}
+
+/* =========================================================
+   WORD COUNT
+========================================================= */
+
+function calculateArticleWords(
+  article
+) {
+  let text = "";
+
+  text +=
+    ` ${article?.title || ""}`;
+
+  text +=
+    ` ${article?.introduction || ""}`;
+
+  text +=
+    ` ${article?.conclusion || ""}`;
+
+  if (
+    Array.isArray(
+      article?.sections
+    )
+  ) {
+    article.sections.forEach(
+      (section) => {
+
+        text +=
+          ` ${section?.heading || ""}`;
+
+        if (
+          Array.isArray(
+            section?.paragraphs
+          )
+        ) {
+          text +=
+            ` ${section.paragraphs.join(
+              " "
+            )}`;
+        }
+
+        if (
+          Array.isArray(
+            section?.bullets
+          )
+        ) {
+          text +=
+            ` ${section.bullets.join(
+              " "
+            )}`;
+        }
+
+        if (
+          Array.isArray(
+            section?.subsections
+          )
+        ) {
+          section.subsections.forEach(
+            (
+              subsection
+            ) => {
+
+              text +=
+                ` ${
+                  subsection?.heading ||
+                  ""
+                }`;
+
+              if (
+                Array.isArray(
+                  subsection?.paragraphs
+                )
+              ) {
+                text +=
+                  ` ${subsection.paragraphs.join(
+                    " "
+                  )}`;
+              }
+
+              if (
+                Array.isArray(
+                  subsection?.bullets
+                )
+              ) {
+                text +=
+                  ` ${subsection.bullets.join(
+                    " "
+                  )}`;
+              }
+
+            }
+          );
+        }
+      }
+    );
+  }
+
+  if (
+    Array.isArray(
+      article?.faq
+    )
+  ) {
+    article.faq.forEach(
+      (item) => {
+        text +=
+          ` ${item?.question || ""}`;
+
+        text +=
+          ` ${item?.answer || ""}`;
+      }
+    );
+  }
+
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+/* =========================================================
+   ARTICLE TO PLAIN TEXT
+========================================================= */
+
+function articleToPlainText(
+  article
+) {
+  const lines = [];
+
+  lines.push(
+    article.title
   );
 
-  return parts.map((part, index) => {
+  lines.push("");
 
-    if (
-      part.startsWith("**") &&
-      part.endsWith("**")
-    ) {
-      return (
-        <strong key={index}>
-          {part.slice(2, -2)}
-        </strong>
+  if (
+    article.metaDescription
+  ) {
+    lines.push(
+      `Meta Description: ${article.metaDescription}`
+    );
+    lines.push("");
+  }
+
+  if (
+    article.focusKeyword
+  ) {
+    lines.push(
+      `Focus Keyword: ${article.focusKeyword}`
+    );
+    lines.push("");
+  }
+
+  if (
+    article.introduction
+  ) {
+    lines.push(
+      "Introduction"
+    );
+
+    lines.push(
+      article.introduction
+    );
+
+    lines.push("");
+  }
+
+  article.sections?.forEach(
+    (section) => {
+
+      lines.push(
+        section.heading ||
+          ""
       );
-    }
 
-    if (
-      part.startsWith("*") &&
-      part.endsWith("*")
-    ) {
-      return (
-        <em key={index}>
-          {part.slice(1, -1)}
-        </em>
+      section.paragraphs?.forEach(
+        (paragraph) =>
+          lines.push(
+            paragraph
+          )
       );
-    }
 
-    if (
-      part.startsWith("`") &&
-      part.endsWith("`")
-    ) {
-      return (
-        <code key={index}>
-          {part.slice(1, -1)}
-        </code>
+      section.bullets?.forEach(
+        (bullet) =>
+          lines.push(
+            `• ${bullet}`
+          )
       );
-    }
 
-    return part;
-  });
+      section.subsections?.forEach(
+        (subsection) => {
+
+          lines.push(
+            subsection.heading ||
+              ""
+          );
+
+          subsection.paragraphs?.forEach(
+            (paragraph) =>
+              lines.push(
+                paragraph
+              )
+          );
+
+          subsection.bullets?.forEach(
+            (bullet) =>
+              lines.push(
+                `• ${bullet}`
+              )
+          );
+
+        }
+      );
+
+      lines.push("");
+    }
+  );
+
+  if (
+    article.faq?.length
+  ) {
+    lines.push(
+      "Frequently Asked Questions"
+    );
+
+    article.faq.forEach(
+      (item) => {
+
+        lines.push(
+          `Q: ${item.question}`
+        );
+
+        lines.push(
+          `A: ${item.answer}`
+        );
+
+        lines.push("");
+
+      }
+    );
+  }
+
+  if (
+    article.conclusion
+  ) {
+    lines.push(
+      "Conclusion"
+    );
+
+    lines.push(
+      article.conclusion
+    );
+  }
+
+  return lines.join("\n");
 }
 
 /* =========================================================
@@ -2264,7 +3241,10 @@ function StatCard({
       <div className="stat-chart">
 
         {chart.map(
-          (height, index) => (
+          (
+            height,
+            index
+          ) => (
             <i
               key={index}
               style={{
@@ -2324,7 +3304,6 @@ function CardHeader({
 ========================================================= */
 
 function MiniCalendar() {
-
   const days = [
     "",
     "",
@@ -2376,18 +3355,25 @@ function MiniCalendar() {
           "Fri",
           "Sat",
           "Sun"
-        ].map((day) => (
-          <span key={day}>
-            {day}
-          </span>
-        ))}
+        ].map(
+          (day) => (
+            <span
+              key={day}
+            >
+              {day}
+            </span>
+          )
+        )}
 
       </div>
 
       <div className="calendar-days">
 
         {days.map(
-          (day, index) => {
+          (
+            day,
+            index
+          ) => {
 
             const isToday =
               day === "26";
@@ -2399,7 +3385,9 @@ function MiniCalendar() {
                     ? "today"
                     : ""
                 }`}
-                key={index}
+                key={
+                  index
+                }
               >
 
                 {day}
