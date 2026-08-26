@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Bot,
@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 
 import "./style.css";
+import { supabase } from "./supabase";
+import Auth from "./Auth";
 
 const navigation = [
   { name: "Dashboard", icon: LayoutDashboard },
@@ -84,10 +86,133 @@ const recentContent = [
 ];
 
 function App() {
+  /* =========================
+     AUTHENTICATION
+  ========================= */
+
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  /* =========================
+     DASHBOARD STATE
+  ========================= */
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
   const [command, setCommand] = useState("");
   const [agentRunning, setAgentRunning] = useState(false);
+
+  /* =========================
+     SUPABASE AUTH SESSION
+  ========================= */
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error("Supabase session error:", error);
+      }
+
+      setSession(data?.session ?? null);
+      setAuthLoading(false);
+    };
+
+    loadSession();
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+
+      setSession(newSession);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  /* =========================
+     AUTH LOADING SCREEN
+  ========================= */
+
+  if (authLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f7f9fc",
+          fontFamily:
+            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "12px"
+          }}
+        >
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "15px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #6d5dfc, #8b7cff)",
+              color: "#fff",
+              boxShadow: "0 12px 30px rgba(109,93,252,.20)"
+            }}
+          >
+            <Sparkles size={22} />
+          </div>
+
+          <strong
+            style={{
+              fontSize: "17px",
+              color: "#172033"
+            }}
+          >
+            AutoPilot AI
+          </strong>
+
+          <span
+            style={{
+              fontSize: "13px",
+              color: "#8992a3"
+            }}
+          >
+            Loading your workspace...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================
+     SHOW AUTH IF NOT LOGGED IN
+  ========================= */
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  /* =========================
+     AI AGENT
+  ========================= */
 
   const runAgent = () => {
     if (!command.trim()) return;
@@ -136,7 +261,7 @@ function App() {
 
           <div className="workspace-info">
             <strong>Faisal's Workspace</strong>
-            <span>Personal Account</span>
+            <span>{session.user?.email || "Personal Account"}</span>
           </div>
 
           <ChevronDown size={15} />
@@ -408,6 +533,7 @@ function App() {
                   value={command}
                   onChange={(event) => setCommand(event.target.value)}
                   placeholder="Tell AutoPilot what you want to create..."
+                  maxLength={500}
                 />
 
                 <div className="input-hint">
@@ -623,7 +749,9 @@ function App() {
   );
 }
 
-/* STAT CARD */
+/* =========================
+   STAT CARD
+========================= */
 
 function StatCard({
   icon,
@@ -663,7 +791,9 @@ function StatCard({
   );
 }
 
-/* CARD HEADER */
+/* =========================
+   CARD HEADER
+========================= */
 
 function CardHeader({
   title,
@@ -687,7 +817,9 @@ function CardHeader({
   );
 }
 
-/* MINI CALENDAR */
+/* =========================
+   MINI CALENDAR
+========================= */
 
 function MiniCalendar() {
 
