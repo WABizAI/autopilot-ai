@@ -12,6 +12,10 @@ export default async function handler(req, res) {
       tone = "Professional"
     } = req.body || {};
 
+    // =====================================================
+    // VALIDATION
+    // =====================================================
+
     if (!keyword || !keyword.trim()) {
       return res.status(400).json({
         error: "Please enter a target keyword."
@@ -44,9 +48,8 @@ You are AutoPilot AI, an elite SEO strategist,
 professional editor, research-minded content writer,
 and digital publishing expert.
 
-Your job is to create a publication-ready article that
-looks and reads like it was written by a highly experienced
-human writer.
+Create a publication-ready article that looks and reads
+like it was written by a highly experienced human writer.
 
 TARGET KEYWORD:
 ${cleanKeyword}
@@ -64,15 +67,14 @@ WRITING QUALITY
 The article must:
 
 - Be genuinely useful to the reader.
-- Answer the user's search intent clearly.
-- Provide practical information.
+- Clearly satisfy the search intent.
 - Explain concepts instead of making vague statements.
 - Use natural human writing.
 - Use varied sentence structures.
 - Avoid repetitive wording.
 - Avoid generic filler.
 - Avoid unnecessary introductions.
-- Avoid repeating the same idea in different sections.
+- Avoid repeating the same idea.
 - Use specific examples where useful.
 - Give actionable advice.
 - Maintain a professional editorial standard.
@@ -122,7 +124,7 @@ SEO REQUIREMENTS
 20. Target approximately 1800-2500 words.
 
 =====================================================
-ARTICLE STRUCTURE
+ARTICLE QUALITY
 =====================================================
 
 The introduction should:
@@ -142,8 +144,7 @@ Each H2 section must contain:
 
 Do not create empty sections.
 
-Do not create empty arrays unless there is genuinely
-nothing appropriate to include.
+Every section must contain real useful content.
 
 FAQ:
 
@@ -154,7 +155,7 @@ IMAGE PROMPT:
 Create a detailed image-generation prompt based on the
 actual article topic.
 
-The image prompt must describe:
+The image prompt should describe:
 
 - subject
 - environment
@@ -226,9 +227,11 @@ Use EXACTLY this structure:
         encodeURIComponent(geminiKey),
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
           contents: [
             {
@@ -240,6 +243,7 @@ Use EXACTLY this structure:
               ]
             }
           ],
+
           generationConfig: {
             temperature: 0.55,
             maxOutputTokens: 16000,
@@ -323,99 +327,6 @@ Style:
 - modern
 - sophisticated
 - professional
-- cinematic but natural lighting
-- realistic materials
-- realistic depth
-- strong composition
-- visually balanced
-- high-end business publication quality
-
-Composition:
-
-- wide landscape composition
-- clear main subject
-- strong visual hierarchy
-- natural depth of field
-- professional camera perspective
-- enough clean space around the main subject
-
-Important:
-
-Do NOT include:
-
-- text
-- letters
-- words
-- logos
-- brand names
-- watermarks
-- UI
-- screenshots
-- fake interfaces
-- distorted objects
-- extra fingers
-- duplicated objects
-
-The final image should look suitable as the featured
-image of a premium professional blog article.
-`;
-
-    try {
-      console.log(
-        "Starting Hugging Face image generation..."
-      );
-
-      const hfResponse = await fetch(
-        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${hfToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            inputs: imagePrompt
-          })
-        }
-      );
-
-      if (!hfResponse.ok) {
-        const errorText = await hfResponse.text();
-
-        console.error(
-          "HUGGING FACE IMAGE API ERROR STATUS:",
-          hfResponse.status
-        );
-
-        console.error(
-          "HUGGING FACE IMAGE API ERROR:",
-// =====================================================
-// STEP 2 — HUGGING FACE FEATURED IMAGE
-// =====================================================
-
-let image = null;
-
-const imagePrompt =
-  article.imagePrompt ||
-  `
-Create a premium professional editorial photograph
-for a high-quality online article.
-
-Article topic:
-${cleanKeyword}
-
-Article title:
-${article.title || cleanKeyword}
-
-Create a visually compelling scene that directly
-represents the article topic.
-
-Style:
-- photorealistic
-- premium editorial photography
-- modern
-- sophisticated
-- professional
 - cinematic natural lighting
 - realistic materials
 - realistic depth
@@ -423,13 +334,23 @@ Style:
 - high-end business publication quality
 
 Composition:
+
 - wide landscape composition
 - clear main subject
 - strong visual hierarchy
 - natural depth of field
 - professional camera perspective
+- balanced composition
+
+Mood:
+
+- professional
+- trustworthy
+- modern
+- visually engaging
 
 Do NOT include:
+
 - text
 - letters
 - words
@@ -445,83 +366,76 @@ Do NOT include:
 Create a professional blog featured image.
 `;
 
-try {
-  console.log(
-    "Starting Hugging Face image generation..."
-  );
-
-  const imageResponse = await fetch(
-    "https://router.huggingface.co/fal-ai/v1/images/generations",
-    {
-      method: "POST",
-
-      headers: {
-        Authorization: `Bearer ${hfToken}`,
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        model: "black-forest-labs/FLUX.1-schnell",
-
-        prompt: imagePrompt,
-
-        num_images: 1,
-
-        image_size: {
-          width: 1344,
-          height: 768
-        }
-      })
-    }
-  );
-
-  const contentType =
-    imageResponse.headers.get("content-type") || "";
-
-  if (!imageResponse.ok) {
-    const errorText =
-      await imageResponse.text();
-
-    console.error(
-      "HUGGING FACE IMAGE API ERROR STATUS:",
-      imageResponse.status
-    );
-
-    console.error(
-      "HUGGING FACE IMAGE API ERROR:",
-      errorText
-    );
-  } else {
-    if (contentType.includes("application/json")) {
-      const imageData =
-        await imageResponse.json();
-
+    try {
       console.log(
-        "HUGGING FACE IMAGE RESPONSE:",
-        JSON.stringify(imageData).slice(0, 2000)
+        "Starting Hugging Face image generation..."
       );
 
-      const imageUrl =
-        imageData?.images?.[0]?.url ||
-        imageData?.data?.[0]?.url ||
-        imageData?.url ||
-        null;
+      /*
+      IMPORTANT:
 
-      if (imageUrl) {
-        const downloadedImage =
-          await fetch(imageUrl);
+      Hugging Face Inference Providers supports text-to-image.
+      We use the fal-ai provider through the HF router.
 
-        if (downloadedImage.ok) {
-          const imageBuffer =
-            Buffer.from(
-              await downloadedImage.arrayBuffer()
-            );
+      Model:
+      black-forest-labs/FLUX.1-dev
+      */
 
+      const imageResponse = await fetch(
+        "https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-dev",
+        {
+          method: "POST",
+
+          headers: {
+            Authorization: `Bearer ${hfToken}`,
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            inputs: imagePrompt,
+
+            parameters: {
+              width: 1344,
+              height: 768,
+              num_inference_steps: 4
+            }
+          })
+        }
+      );
+
+      console.log(
+        "HUGGING FACE IMAGE STATUS:",
+        imageResponse.status
+      );
+
+      const contentType =
+        imageResponse.headers.get("content-type") || "";
+
+      if (!imageResponse.ok) {
+        const errorText =
+          await imageResponse.text();
+
+        console.error(
+          "HUGGING FACE IMAGE API ERROR STATUS:",
+          imageResponse.status
+        );
+
+        console.error(
+          "HUGGING FACE IMAGE API ERROR:",
+          errorText
+        );
+      } else if (
+        contentType.startsWith("image/")
+      ) {
+        const imageBuffer =
+          Buffer.from(
+            await imageResponse.arrayBuffer()
+          );
+
+        if (imageBuffer.length > 0) {
           image = {
             mimeType:
-              downloadedImage.headers.get(
-                "content-type"
-              ) || "image/png",
+              contentType || "image/png",
 
             data:
               imageBuffer.toString("base64")
@@ -531,41 +445,26 @@ try {
             "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
           );
         }
-      }
-    } else {
-      const imageBuffer =
-        Buffer.from(
-          await imageResponse.arrayBuffer()
+      } else {
+        const responseText =
+          await imageResponse.text();
+
+        console.error(
+          "HUGGING FACE RETURNED NON-IMAGE RESPONSE:"
         );
 
-      if (imageBuffer.length > 0) {
-        image = {
-          mimeType:
-            contentType || "image/png",
-
-          data:
-            imageBuffer.toString("base64")
-        };
-
-        console.log(
-          "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+        console.error(
+          responseText.slice(0, 3000)
         );
       }
-    }
 
-    if (!image) {
+    } catch (imageError) {
       console.error(
-        "HUGGING FACE RETURNED NO IMAGE"
+        "HUGGING FACE IMAGE GENERATION FAILED:",
+        imageError
       );
     }
-  }
 
-} catch (imageError) {
-  console.error(
-    "HUGGING FACE IMAGE GENERATION FAILED:",
-    imageError
-  );
-}
     // =====================================================
     // STEP 3 — WORD COUNT
     // =====================================================
@@ -577,9 +476,11 @@ try {
         ? article.sections.flatMap(
             (section) => [
               section.heading || "",
+
               ...(Array.isArray(section.paragraphs)
                 ? section.paragraphs
                 : []),
+
               ...(Array.isArray(section.bullets)
                 ? section.bullets
                 : []),
@@ -588,11 +489,13 @@ try {
                 ? section.subsections.flatMap(
                     (subsection) => [
                       subsection.heading || "",
+
                       ...(Array.isArray(
                         subsection.paragraphs
                       )
                         ? subsection.paragraphs
                         : []),
+
                       ...(Array.isArray(
                         subsection.bullets
                       )
@@ -638,6 +541,7 @@ try {
 
       article: {
         ...article,
+
         wordCount:
           calculatedWordCount ||
           article.wordCount ||
