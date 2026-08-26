@@ -42,17 +42,28 @@ export default async function handler(req, res) {
     const cleanKeyword = keyword.trim();
 
     // =====================================================
-    // STEP 1 — PROFESSIONAL SEO ARTICLE
+    // STEP 1 — PREMIUM SEO ARTICLE GENERATION
     // =====================================================
 
     const articlePrompt = `
-You are an elite SEO strategist, professional editor,
-research-minded content writer and digital publishing expert.
+You are a senior digital publisher, expert SEO strategist,
+professional journalist, subject-matter writer and
+experienced editorial content creator.
 
-Create a publication-ready article that feels like it was
-written by an experienced professional human writer.
+Your task is to write a HIGH-QUALITY, publication-ready
+article that could realistically appear on a respected
+professional website.
 
-TARGET KEYWORD:
+The article must NOT feel like a generic AI-generated article.
+
+It must feel researched, thoughtful, specific, useful,
+well-structured and professionally edited.
+
+=====================================================
+ARTICLE INPUT
+=====================================================
+
+PRIMARY KEYWORD:
 ${cleanKeyword}
 
 LANGUAGE:
@@ -61,115 +72,335 @@ ${language}
 TONE:
 ${tone}
 
-WRITING QUALITY:
+=====================================================
+CORE OBJECTIVE
+=====================================================
 
-- Write genuinely useful content for real readers.
-- Clearly satisfy the search intent.
-- Explain concepts instead of making vague statements.
-- Use natural human writing.
-- Use varied sentence structures.
-- Avoid repetitive wording.
-- Avoid generic filler.
-- Avoid unnecessary introductions.
-- Avoid repeating the same information.
-- Use specific examples where useful.
-- Give actionable advice.
-- Maintain a professional editorial standard.
-- Use natural transitions between sections.
-- Give practical information instead of generic statements.
+Write for a real person who searched for:
 
-DO NOT mention:
+"${cleanKeyword}"
 
-- AI
-- Gemini
-- prompts
-- content generation
-- language models
-- these instructions
-- being an AI
-- AutoPilot AI
+First determine what this person actually wants to know.
 
-Do not invent statistics.
-Do not create fake studies.
-Do not invent citations.
-Do not make unsupported factual claims.
+The article must satisfy the search intent immediately and
+then progressively provide deeper information.
 
-SEO REQUIREMENTS:
+Do not write simply to reach a word count.
 
-1. Create an attractive SEO title.
-2. Include the primary keyword naturally.
-3. Create a 140-160 character meta description.
-4. Create a clean SEO-friendly slug.
-5. Provide one focus keyword.
-6. Provide 8-12 secondary keywords.
-7. Identify the search intent.
-8. Write a strong introduction.
-9. Create 6-8 detailed H2 sections.
-10. Add useful H3 subsections.
-11. Use semantic keywords naturally.
-12. Avoid keyword stuffing.
-13. Include practical examples.
-14. Include actionable recommendations.
-15. Include bullet lists where useful.
-16. Include numbered lists where useful.
-17. Include exactly 6 useful FAQ questions.
-18. Write a strong conclusion.
-19. Create a detailed professional image prompt.
-20. Target approximately 1800-2500 words.
+Every paragraph must have a purpose.
 
-ARTICLE QUALITY:
+Every section must teach, explain, compare, demonstrate,
+solve a problem or provide useful guidance.
 
-The introduction must:
+=====================================================
+HUMAN EDITORIAL STYLE
+=====================================================
 
-- Clearly explain the topic.
-- Address the reader's problem.
-- Explain what the reader will learn.
-- Naturally include the primary keyword.
+Write naturally and professionally.
 
-Each H2 section must contain:
+Use:
 
-- A meaningful heading.
-- Multiple useful paragraphs.
-- Practical information.
-- Examples where appropriate.
-- Bullets or numbered points where useful.
-- H3 subsections where useful.
+- varied sentence lengths
+- natural transitions
+- precise wording
+- clear explanations
+- concrete examples
+- practical recommendations
+- contextual details
+- useful comparisons
+- realistic scenarios
+- confident but balanced language
 
-Do not create empty sections.
-Do not create filler content.
-Do not repeat the same information across sections.
+Avoid:
 
-FAQ:
+- robotic wording
+- repetitive sentence patterns
+- generic introductions
+- filler paragraphs
+- unnecessary summaries
+- excessive headings
+- keyword stuffing
+- exaggerated claims
+- fake authority
+- vague advice
+- obvious AI-style phrases
 
-Create exactly 6 useful questions and detailed answers.
+Do NOT repeatedly use phrases such as:
 
-IMAGE PROMPT:
+"Whether you are..."
+"In today's digital world..."
+"In today's fast-paced world..."
+"It is important to note..."
+"Understanding this..."
+"By following these..."
+"In conclusion..."
 
-Create a detailed professional image-generation prompt
-based on the actual article topic.
+Use natural alternatives.
 
-The image prompt should describe:
+=====================================================
+FACTUAL ACCURACY
+=====================================================
 
-- subject
+Do not invent:
+
+- statistics
+- research
+- studies
+- surveys
+- expert quotes
+- company claims
+- dates
+- prices
+- percentages
+- citations
+
+If a specific fact cannot be confidently established,
+write around it rather than inventing it.
+
+Do not make unsupported claims.
+
+When discussing products, services, technologies,
+laws, prices or current information, avoid pretending
+that information is current unless it is provided in
+the prompt.
+
+=====================================================
+INTRODUCTION
+=====================================================
+
+Write a strong opening.
+
+The introduction should:
+
+1. Start with the reader's actual problem, question or goal.
+2. Explain why the topic matters.
+3. Give the reader a clear idea of what they will learn.
+4. Naturally introduce the primary keyword.
+5. Avoid generic motivational statements.
+6. Avoid unnecessary history or background.
+
+The introduction should feel like a professional editor
+wrote it specifically for the search query.
+
+=====================================================
+ARTICLE STRUCTURE
+=====================================================
+
+Create 7 strong H2 sections.
+
+Each H2 must cover a DISTINCT aspect of the topic.
+
+Do not repeat information between sections.
+
+Use H3 subsections only when they genuinely improve
+the explanation.
+
+Each major section should contain:
+
+- 2-4 substantial paragraphs
+- practical details
+- examples when appropriate
+- bullets or numbered steps when useful
+- useful H3 subsections when appropriate
+
+Do not create short meaningless sections.
+
+Do not create sections just to satisfy a number.
+
+=====================================================
+DEPTH REQUIREMENT
+=====================================================
+
+The article should demonstrate actual understanding.
+
+For each major concept:
+
+1. Explain WHAT it is.
+2. Explain WHY it matters.
+3. Explain HOW it works or should be approached.
+4. Give an example when useful.
+5. Explain common mistakes or limitations when relevant.
+6. Give a practical recommendation.
+
+This creates depth instead of surface-level content.
+
+=====================================================
+PRACTICAL EXAMPLES
+=====================================================
+
+Where appropriate, include realistic examples.
+
+Examples should help the reader understand the topic.
+
+Do not invent fake statistics or fake case studies.
+
+Use hypothetical examples only when clearly presented
+as examples.
+
+=====================================================
+LISTS
+=====================================================
+
+Use bullet lists for:
+
+- key points
+- features
+- advantages
+- mistakes
+- considerations
+- quick recommendations
+
+Use numbered lists for:
+
+- processes
+- step-by-step instructions
+- strategies
+- workflows
+
+Do not turn every paragraph into a list.
+
+=====================================================
+SEARCH INTENT
+=====================================================
+
+Identify the most appropriate search intent.
+
+Possible intents include:
+
+- informational
+- commercial investigation
+- transactional
+- navigational
+
+Choose the best one for the keyword.
+
+=====================================================
+SEO REQUIREMENTS
+=====================================================
+
+Create:
+
+1. Strong SEO title.
+2. Meta description between 140-160 characters.
+3. Clean URL slug.
+4. Focus keyword.
+5. 8-12 secondary keywords.
+6. Search intent.
+7. Short useful excerpt.
+8. Semantically relevant language.
+
+The primary keyword should appear naturally.
+
+Do NOT force the keyword into every heading.
+
+Do NOT keyword stuff.
+
+=====================================================
+FAQ
+=====================================================
+
+Create EXACTLY 6 useful FAQ questions.
+
+Questions should represent realistic things people
+would ask after reading the article.
+
+Answers must be detailed and useful.
+
+Do not repeat entire sections of the article.
+
+=====================================================
+CONCLUSION
+=====================================================
+
+Write a strong conclusion.
+
+Do not simply repeat the introduction.
+
+Summarize the most important practical takeaways.
+
+End with a useful final recommendation or perspective.
+
+=====================================================
+FEATURED IMAGE PROMPT
+=====================================================
+
+Create a detailed image-generation prompt based on
+the actual article.
+
+The image should visually communicate the topic.
+
+Describe:
+
+- main subject
 - environment
-- composition
-- lighting
-- visual style
 - important objects
-- mood
+- composition
 - perspective
+- lighting
+- depth
+- mood
+- visual style
 
-Do NOT include:
+The image should look like a premium editorial
+featured image for a professional publication.
+
+Do NOT request:
 
 - text
 - logos
 - watermarks
 - titles
-- UI elements
+- UI
+- screenshots
+- fake interfaces
 
 inside the image.
 
-RETURN JSON ONLY.
+=====================================================
+ARTICLE LENGTH
+=====================================================
+
+Target approximately 1800-2500 words.
+
+Do NOT artificially repeat ideas to reach the target.
+
+Quality is more important than word count.
+
+=====================================================
+FINAL QUALITY CHECK
+=====================================================
+
+Before returning the article, silently check:
+
+- Does the article actually answer the search query?
+- Is the introduction strong?
+- Does every H2 add new information?
+- Are paragraphs substantial?
+- Are examples useful?
+- Is the writing natural?
+- Is anything repetitive?
+- Is there filler?
+- Are SEO keywords natural?
+- Are all 6 FAQs useful?
+- Is the conclusion meaningful?
+- Is the image prompt relevant?
+
+If any section feels generic, rewrite it before returning.
+
+=====================================================
+STRICT JSON OUTPUT
+=====================================================
+
+Return ONLY valid JSON.
+
+Do NOT return:
+
+- markdown
+- code fences
+- explanations
+- comments
+- text before JSON
+- text after JSON
 
 Use EXACTLY this structure:
 
@@ -278,7 +509,7 @@ Use EXACTLY this structure:
     }
 
     // =====================================================
-    // PARSE ARTICLE JSON
+    // PARSE JSON
     // =====================================================
 
     let article;
@@ -378,11 +609,7 @@ Do NOT include:
         "HF model: black-forest-labs/FLUX.1-dev"
       );
 
-      // IMPORTANT:
       // Token MUST be passed as a string.
-      // This fixes:
-      // "accessToken.startsWith is not a function"
-
       const hf = new InferenceClient(hfToken);
 
       const generatedImage =
