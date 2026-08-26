@@ -413,54 +413,132 @@ Do NOT include:
       const imageBuffer =
         Buffer.from(
           await generatedImage.arrayBuffer()
-        );
+// =====================================================
+// STEP 2 — HUGGING FACE FEATURED IMAGE
+// =====================================================
 
-      if (imageBuffer.length > 0) {
-        image = {
-          mimeType:
-            generatedImage.type ||
-            "image/png",
+let image = null;
 
-          data:
-            imageBuffer.toString("base64")
-        };
+const imagePrompt =
+  article.imagePrompt ||
+  `
+Create a premium professional editorial featured image.
 
-        console.log(
-          "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
-        );
+Article topic:
+${cleanKeyword}
 
-        console.log(
-          "IMAGE MIME TYPE:",
-          image.mimeType
-        );
+Article title:
+${article.title || cleanKeyword}
 
-        console.log(
-          "IMAGE SIZE:",
-          imageBuffer.length
-        );
-      } else {
-        console.error(
-          "HUGGING FACE RETURNED EMPTY IMAGE"
-        );
-      }
+Create a visually compelling scene that directly represents
+the article topic.
 
-    } catch (imageError) {
+Style:
+- photorealistic
+- premium editorial photography
+- modern
+- sophisticated
+- professional
+- natural cinematic lighting
+- realistic materials
+- realistic depth
+- strong composition
+- high-end publication quality
 
-      console.error(
-        "HUGGING FACE IMAGE GENERATION FAILED:"
-      );
+Composition:
+- wide landscape composition
+- clear main subject
+- strong visual hierarchy
+- professional camera perspective
+- natural depth of field
+- balanced composition
 
-      console.error(
-        imageError?.message ||
-        imageError
-      );
+Mood:
+- professional
+- trustworthy
+- modern
+- visually engaging
 
-      if (imageError?.response) {
-        console.error(
-          "HF ERROR RESPONSE:",
-          imageError.response
-        );
-      }
+Do NOT include:
+- text
+- letters
+- words
+- logos
+- brand names
+- watermarks
+- UI
+- screenshots
+- fake interfaces
+- distorted objects
+- duplicated objects
+`;
+
+try {
+  console.log("Starting Hugging Face image generation...");
+
+  const hf = new InferenceClient(hfToken, {
+    provider: "fal-ai"
+  });
+
+  console.log("HF provider: fal-ai");
+  console.log("HF model: black-forest-labs/FLUX.1-dev");
+
+  const generatedImage = await hf.textToImage({
+    model: "black-forest-labs/FLUX.1-dev",
+
+    inputs: imagePrompt,
+
+    parameters: {
+      width: 1344,
+      height: 768,
+      num_inference_steps: 4
+    }
+  });
+
+  const imageBuffer = Buffer.from(
+    await generatedImage.arrayBuffer()
+  );
+
+  if (imageBuffer.length > 0) {
+    image = {
+      mimeType:
+        generatedImage.type || "image/png",
+
+      data:
+        imageBuffer.toString("base64")
+    };
+
+    console.log(
+      "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+    );
+
+    console.log(
+      "IMAGE MIME TYPE:",
+      image.mimeType
+    );
+
+    console.log(
+      "IMAGE SIZE:",
+      imageBuffer.length
+    );
+  } else {
+    console.error(
+      "HUGGING FACE RETURNED EMPTY IMAGE"
+    );
+  }
+
+} catch (imageError) {
+
+  console.error(
+    "HUGGING FACE IMAGE GENERATION FAILED:"
+  );
+
+  console.error(
+    imageError?.message ||
+    imageError
+  );
+
+}
     }
 
     // =====================================================
