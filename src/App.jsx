@@ -29,13 +29,16 @@ import {
   X,
   Copy,
   RefreshCw,
-  Eye,
   Target,
   Hash,
-  Type,
   AlignLeft,
   Check,
   Download,
+  Link2,
+  Activity,
+  TrendingUp,
+  Users,
+  FileSearch,
   ExternalLink
 } from "lucide-react";
 
@@ -68,16 +71,40 @@ const navigation = [
 ========================================================= */
 
 const socialAccounts = [
-  { name: "Facebook", icon: "f", className: "facebook" },
-  { name: "Instagram", icon: "◎", className: "instagram" },
-  { name: "X", icon: "𝕏", className: "x" },
-  { name: "Pinterest", icon: "p", className: "pinterest" },
-  { name: "Tumblr", icon: "t", className: "tumblr" },
-  { name: "Blogger", icon: "B", className: "blogger" }
+  {
+    name: "Facebook",
+    icon: "f",
+    className: "facebook"
+  },
+  {
+    name: "Instagram",
+    icon: "◎",
+    className: "instagram"
+  },
+  {
+    name: "X",
+    icon: "𝕏",
+    className: "x"
+  },
+  {
+    name: "Pinterest",
+    icon: "p",
+    className: "pinterest"
+  },
+  {
+    name: "Tumblr",
+    icon: "t",
+    className: "tumblr"
+  },
+  {
+    name: "Blogger",
+    icon: "B",
+    className: "blogger"
+  }
 ];
 
 /* =========================================================
-   DEMO RECENT CONTENT
+   DEFAULT CONTENT
 ========================================================= */
 
 const defaultRecentContent = [
@@ -121,23 +148,64 @@ function App() {
   const [command, setCommand] = useState("");
   const [agentRunning, setAgentRunning] = useState(false);
 
-  /* ARTICLE */
+  const [notificationsOpen, setNotificationsOpen] =
+    useState(false);
 
-  const [articleModal, setArticleModal] = useState(false);
+  const [connectedAccounts, setConnectedAccounts] =
+    useState({});
 
-  const [articleKeyword, setArticleKeyword] = useState("");
+  const [agentActivities, setAgentActivities] =
+    useState([
+      {
+        icon: "✍️",
+        title: "Content engine ready",
+        text: "AI is ready to create your next article.",
+        time: "Now"
+      },
+      {
+        icon: "📊",
+        title: "Analytics synchronized",
+        text: "Latest workspace metrics are available.",
+        time: "12 min ago"
+      },
+      {
+        icon: "📅",
+        title: "Schedule checked",
+        text: "Your upcoming content calendar is healthy.",
+        time: "28 min ago"
+      }
+    ]);
+
+  /* =======================================================
+     ARTICLE STATE
+  ======================================================= */
+
+  const [articleModal, setArticleModal] =
+    useState(false);
+
+  const [articleKeyword, setArticleKeyword] =
+    useState("");
+
   const [articleAudience, setArticleAudience] =
     useState("General audience");
+
   const [articleTone, setArticleTone] =
     useState("Professional");
+
   const [articleLength, setArticleLength] =
     useState("Long");
+
   const [articleLanguage, setArticleLanguage] =
     useState("English");
 
-  const [articleLoading, setArticleLoading] = useState(false);
-  const [articleError, setArticleError] = useState("");
-  const [articleResult, setArticleResult] = useState(null);
+  const [articleLoading, setArticleLoading] =
+    useState(false);
+
+  const [articleError, setArticleError] =
+    useState("");
+
+  const [articleResult, setArticleResult] =
+    useState(null);
 
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -146,7 +214,7 @@ function App() {
     useState(defaultRecentContent);
 
   /* =======================================================
-     AUTH SESSION
+     AUTH
   ======================================================= */
 
   useEffect(() => {
@@ -189,7 +257,31 @@ function App() {
   }, []);
 
   /* =======================================================
-     AUTH LOADING
+     USER
+  ======================================================= */
+
+  const userEmail =
+    session?.user?.email ||
+    "Personal Account";
+
+  const userName = useMemo(() => {
+    const metadata =
+      session?.user?.user_metadata;
+
+    return (
+      metadata?.full_name ||
+      metadata?.name ||
+      userEmail
+        .split("@")[0]
+        .replace(/[^a-zA-Z0-9]/g, " ")
+        .split(" ")
+        .filter(Boolean)[0] ||
+      "Faisal"
+    );
+  }, [session, userEmail]);
+
+  /* =======================================================
+     LOADING
   ======================================================= */
 
   if (authLoading) {
@@ -219,7 +311,61 @@ function App() {
   }
 
   /* =======================================================
-     AI COMMAND CENTER
+     NAVIGATION
+  ======================================================= */
+
+  const navigateTo = (page) => {
+    setActivePage(page);
+    setSidebarOpen(false);
+
+    if (page === "Content") {
+      openArticleGenerator();
+      return;
+    }
+
+    if (page === "AI Command Center") {
+      document
+        .querySelector(".command-card")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+    }
+  };
+
+  /* =======================================================
+     ARTICLE GENERATOR
+  ======================================================= */
+
+  function openArticleGenerator() {
+    setArticleError("");
+    setArticleModal(true);
+  }
+
+  const quickArticle = () => {
+    setArticleKeyword("");
+    setArticleResult(null);
+    setArticleError("");
+    setSaved(false);
+    setArticleModal(true);
+  };
+
+  /* =======================================================
+     QUICK COMMAND
+  ======================================================= */
+
+  const setQuickCommand = (text) => {
+    setCommand(text);
+
+    setTimeout(() => {
+      document
+        .querySelector(".command-input-wrapper textarea")
+        ?.focus();
+    }, 50);
+  };
+
+  /* =======================================================
+     AI AGENT
   ======================================================= */
 
   const runAgent = async () => {
@@ -227,6 +373,16 @@ function App() {
 
     setAgentRunning(true);
     setArticleError("");
+
+    setAgentActivities((previous) => [
+      {
+        icon: "🤖",
+        title: "AI Agent started",
+        text: command.trim(),
+        time: "Just now"
+      },
+      ...previous
+    ].slice(0, 5));
 
     try {
       const response = await fetch(
@@ -237,12 +393,13 @@ function App() {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            prompt: command
+            prompt: command.trim()
           })
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -251,6 +408,9 @@ function App() {
         );
       }
 
+      const responseText =
+        data?.response || "";
+
       setArticleResult({
         title: "AI Agent Response",
         metaDescription: "",
@@ -258,15 +418,27 @@ function App() {
         secondaryKeywords: [],
         searchIntent: "",
         excerpt: "",
-        introduction: data.response || "",
+        introduction: responseText,
         sections: [],
         faq: [],
         conclusion: "",
         imageUrl: null,
-        wordCount: (data.response || "")
-          .split(/\s+/)
-          .filter(Boolean).length
+        wordCount:
+          responseText
+            .split(/\s+/)
+            .filter(Boolean)
+            .length
       });
+
+      setAgentActivities((previous) => [
+        {
+          icon: "✅",
+          title: "AI Agent completed",
+          text: "Your request has been completed successfully.",
+          time: "Just now"
+        },
+        ...previous
+      ].slice(0, 5));
 
       setArticleModal(true);
       setCommand("");
@@ -288,24 +460,11 @@ function App() {
   };
 
   /* =======================================================
-     OPEN ARTICLE GENERATOR
+     IMAGE NORMALIZER
   ======================================================= */
 
-  const openArticleGenerator = () => {
-    setArticleError("");
-    setArticleModal(true);
-  };
-
-  /* =======================================================
-     CONVERT GENERATED IMAGE
-  ======================================================= */
-
-  const convertGeneratedImage = (
-    image
-  ) => {
+  const convertGeneratedImage = (image) => {
     if (!image) return null;
-
-    /* Already URL */
 
     if (typeof image === "string") {
       if (
@@ -318,8 +477,6 @@ function App() {
 
       return `data:image/png;base64,${image}`;
     }
-
-    /* Gemini inlineData structure */
 
     const data =
       image?.data ||
@@ -336,7 +493,7 @@ function App() {
   };
 
   /* =======================================================
-     SAVE ARTICLE TO SUPABASE
+     SAVE ARTICLE
   ======================================================= */
 
   const saveArticleToSupabase = async (
@@ -347,17 +504,7 @@ function App() {
       const userId =
         session?.user?.id;
 
-      if (!userId) {
-        console.warn(
-          "No authenticated user."
-        );
-        return false;
-      }
-
-      /*
-       * We save the complete structured article
-       * inside content as JSON text.
-       */
+      if (!userId) return false;
 
       const articleContent =
         JSON.stringify(article);
@@ -370,14 +517,17 @@ function App() {
             title:
               article.title ||
               "Untitled Article",
-            content: articleContent,
+            content:
+              articleContent,
             keyword:
               article.focusKeyword ||
               articleKeyword,
             meta_description:
-              article.metaDescription || "",
+              article.metaDescription ||
+              "",
             slug:
-              article.slug || "",
+              article.slug ||
+              "",
             image_url:
               imageUrl || null
           });
@@ -428,24 +578,20 @@ function App() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type":
+              "application/json"
           },
           body: JSON.stringify({
             keyword:
               articleKeyword.trim(),
-
             audience:
               articleAudience,
-
             tone:
               articleTone,
-
             length:
               articleLength,
-
             language:
               articleLanguage,
-
             seo: {
               optimized: true,
               includeTitle: true,
@@ -457,7 +603,6 @@ function App() {
               includeConclusion: true,
               naturalHumanTone: true
             },
-
             image: {
               generate: true,
               relatedToArticle: true,
@@ -477,19 +622,6 @@ function App() {
         );
       }
 
-      /*
-       * article.js returns:
-       *
-       * {
-       *   success,
-       *   article: {...},
-       *   image: {
-       *     mimeType,
-       *     data
-       *   }
-       * }
-       */
-
       const article =
         data?.article;
 
@@ -506,6 +638,7 @@ function App() {
 
       const normalizedArticle = {
         ...article,
+
         title:
           article.title ||
           "AI Generated Article",
@@ -542,12 +675,16 @@ function App() {
           "",
 
         sections:
-          Array.isArray(article.sections)
+          Array.isArray(
+            article.sections
+          )
             ? article.sections
             : [],
 
         faq:
-          Array.isArray(article.faq)
+          Array.isArray(
+            article.faq
+          )
             ? article.faq
             : [],
 
@@ -561,14 +698,12 @@ function App() {
 
         wordCount:
           article.wordCount ||
-          calculateArticleWords(article),
+          calculateArticleWords(
+            article
+          ),
 
         imageUrl
       };
-
-      /*
-       * SAVE TO SUPABASE
-       */
 
       const wasSaved =
         await saveArticleToSupabase(
@@ -578,38 +713,40 @@ function App() {
 
       setSaved(wasSaved);
 
-      /*
-       * RESULT
-       */
-
       setArticleResult(
         normalizedArticle
       );
-
-      /*
-       * RECENT CONTENT
-       */
 
       setRecentContent(
         (previous) => [
           {
             title:
               normalizedArticle.title,
-
             date:
               "Just now",
-
             type:
               "SEO Article",
-
             color:
               "purple"
           },
-
           ...previous
         ]
       );
 
+      setAgentActivities(
+        (previous) => [
+          {
+            icon: "📝",
+            title:
+              "Article generated",
+            text:
+              normalizedArticle.title,
+            time:
+              "Just now"
+          },
+          ...previous
+        ].slice(0, 5)
+      );
     } catch (error) {
       console.error(
         "Article generation error:",
@@ -626,7 +763,7 @@ function App() {
   };
 
   /* =======================================================
-     COPY ARTICLE
+     COPY
   ======================================================= */
 
   const copyArticle = async () => {
@@ -656,7 +793,7 @@ function App() {
   };
 
   /* =======================================================
-     DOWNLOAD ARTICLE
+     DOWNLOAD
   ======================================================= */
 
   const downloadArticle = () => {
@@ -697,15 +834,49 @@ function App() {
   };
 
   /* =======================================================
-     QUICK ARTICLE
+     SOCIAL CONNECT
   ======================================================= */
 
-  const quickArticle = () => {
-    setArticleKeyword("");
-    setArticleResult(null);
+  const connectSocialAccount = (
+    accountName
+  ) => {
+    setConnectedAccounts(
+      (previous) => ({
+        ...previous,
+        [accountName]:
+          !previous[accountName]
+      })
+    );
+
+    setAgentActivities(
+      (previous) => [
+        {
+          icon: "🔗",
+          title:
+            connectedAccounts[
+              accountName
+            ]
+              ? `${accountName} disconnected`
+              : `${accountName} connected`,
+          text:
+            "Social account status updated.",
+          time:
+            "Just now"
+        },
+        ...previous
+      ].slice(0, 5)
+    );
+  };
+
+  /* =======================================================
+     CLOSE MODAL
+  ======================================================= */
+
+  const closeArticleModal = () => {
+    if (articleLoading) return;
+
+    setArticleModal(false);
     setArticleError("");
-    setSaved(false);
-    setArticleModal(true);
   };
 
   /* =======================================================
@@ -726,7 +897,9 @@ function App() {
         />
       )}
 
-      {/* SIDEBAR */}
+      {/* ===================================================
+          SIDEBAR
+      =================================================== */}
 
       <aside
         className={`sidebar ${
@@ -766,18 +939,21 @@ function App() {
         <div className="workspace">
 
           <div className="workspace-avatar">
-            F
+            {userName
+              .charAt(0)
+              .toUpperCase()}
           </div>
 
           <div className="workspace-info">
+
             <strong>
-              Faisal's Workspace
+              {userName}'s Workspace
             </strong>
 
             <span>
-              {session.user?.email ||
-                "Personal Account"}
+              {userEmail}
             </span>
+
           </div>
 
           <ChevronDown size={15} />
@@ -797,53 +973,20 @@ function App() {
 
               return (
                 <button
-                  key={item.name}
+                  key={
+                    item.name
+                  }
                   className={`nav-link ${
                     activePage ===
                     item.name
                       ? "active"
                       : ""
                   }`}
-                  onClick={() => {
-
-                    if (
-                      item.name ===
-                      "AI Command Center"
-                    ) {
-                      setActivePage(
-                        item.name
-                      );
-                      setSidebarOpen(
-                        false
-                      );
-                      return;
-                    }
-
-                    if (
-                      item.name ===
-                      "Content"
-                    ) {
-                      setActivePage(
-                        item.name
-                      );
-
-                      openArticleGenerator();
-
-                      setSidebarOpen(
-                        false
-                      );
-
-                      return;
-                    }
-
-                    setActivePage(
+                  onClick={() =>
+                    navigateTo(
                       item.name
-                    );
-
-                    setSidebarOpen(
-                      false
-                    );
-                  }}
+                    )
+                  }
                 >
 
                   <Icon size={17} />
@@ -868,14 +1011,18 @@ function App() {
 
         <div className="sidebar-spacer" />
 
+        {/* USAGE */}
+
         <div className="usage-card">
 
           <div className="usage-header">
+
             <span>
               AI Usage
             </span>
 
             <Zap size={14} />
+
           </div>
 
           <div className="usage-number">
@@ -890,6 +1037,7 @@ function App() {
           </div>
 
           <div className="usage-bottom">
+
             <span>
               46.9% used
             </span>
@@ -897,14 +1045,20 @@ function App() {
             <span>
               Tokens
             </span>
+
           </div>
 
           <button className="upgrade-button">
+
             <Sparkles size={14} />
+
             Upgrade to Pro
+
           </button>
 
         </div>
+
+        {/* AGENT MINI STATUS */}
 
         <div className="mini-agent-card">
 
@@ -913,6 +1067,7 @@ function App() {
           </div>
 
           <div>
+
             <strong>
               AI Agent Active
             </strong>
@@ -921,6 +1076,7 @@ function App() {
               Everything is running
               smoothly.
             </span>
+
           </div>
 
           <div className="online-dot" />
@@ -929,7 +1085,9 @@ function App() {
 
       </aside>
 
-      {/* MAIN */}
+      {/* ===================================================
+          MAIN
+      =================================================== */}
 
       <main className="main-area">
 
@@ -962,6 +1120,7 @@ function App() {
                 quickArticle
               }
             >
+
               <Plus size={17} />
 
               <span>
@@ -971,23 +1130,110 @@ function App() {
               <ChevronDown
                 size={14}
               />
+
             </button>
 
-            <button className="notification-button">
-              <Bell size={19} />
-              <span>3</span>
-            </button>
+            {/* NOTIFICATIONS */}
+
+            <div className="notification-wrapper">
+
+              <button
+                className="notification-button"
+                onClick={() =>
+                  setNotificationsOpen(
+                    (value) =>
+                      !value
+                  )
+                }
+              >
+
+                <Bell size={19} />
+
+                <span>
+                  3
+                </span>
+
+              </button>
+
+              {notificationsOpen && (
+                <div className="notification-dropdown">
+
+                  <div className="notification-dropdown-header">
+
+                    <strong>
+                      Notifications
+                    </strong>
+
+                    <span>
+                      3 new
+                    </span>
+
+                  </div>
+
+                  <div className="notification-item">
+
+                    <div>
+                      <CheckCircle2
+                        size={16}
+                      />
+                    </div>
+
+                    <span>
+                      AI Agent is ready
+                      for your next task.
+                    </span>
+
+                  </div>
+
+                  <div className="notification-item">
+
+                    <div>
+                      <FileText
+                        size={16}
+                      />
+                    </div>
+
+                    <span>
+                      Your content
+                      workspace is ready.
+                    </span>
+
+                  </div>
+
+                  <div className="notification-item">
+
+                    <div>
+                      <CalendarDays
+                        size={16}
+                      />
+                    </div>
+
+                    <span>
+                      3 posts are scheduled
+                      this week.
+                    </span>
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* USER */}
 
             <div className="user-menu">
 
               <div className="user-avatar">
-                F
+                {userName
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
 
               <div className="user-details">
 
                 <strong>
-                  Faisal
+                  {userName}
                 </strong>
 
                 <span>
@@ -1006,9 +1252,13 @@ function App() {
 
         </header>
 
-        {/* DASHBOARD */}
+        {/* =================================================
+            DASHBOARD
+        ================================================= */}
 
         <div className="dashboard-container">
+
+          {/* WELCOME */}
 
           <section className="welcome-section">
 
@@ -1023,7 +1273,8 @@ function App() {
               </div>
 
               <h1>
-                Good morning, Faisal{" "}
+                Good morning,{" "}
+                {userName}{" "}
                 <span>
                   👋
                 </span>
@@ -1055,7 +1306,9 @@ function App() {
 
           </section>
 
-          {/* STATS */}
+          {/* =================================================
+              STATS
+          ================================================= */}
 
           <section className="stats-grid">
 
@@ -1141,50 +1394,87 @@ function App() {
 
           </section>
 
-          {/* PRIMARY GRID */}
+          {/* =================================================
+              PRIMARY GRID
+          ================================================= */}
 
           <section className="primary-grid">
+
+            {/* CONNECTED ACCOUNTS */}
 
             <div className="dashboard-card accounts-card">
 
               <CardHeader
-                title="Connected Accounts"
-                subtitle="Your publishing destinations"
+                title="Social Accounts"
+                subtitle="Connect your publishing destinations"
                 action="Manage All"
               />
 
               <div className="social-grid">
 
                 {socialAccounts.map(
-                  (account) => (
-                    <div
-                      className="social-account"
-                      key={
+                  (account) => {
+                    const isConnected =
+                      !!connectedAccounts[
                         account.name
-                      }
-                    >
+                      ];
 
+                    return (
                       <div
-                        className={`social-icon ${account.className}`}
-                      >
-                        {
-                          account.icon
-                        }
-                      </div>
-
-                      <strong>
-                        {
+                        className="social-account"
+                        key={
                           account.name
                         }
-                      </strong>
+                      >
 
-                      <span className="connected-status">
-                        <i />
-                        Connected
-                      </span>
+                        <div
+                          className={`social-icon ${account.className}`}
+                        >
+                          {
+                            account.icon
+                          }
+                        </div>
 
-                    </div>
-                  )
+                        <strong>
+                          {
+                            account.name
+                          }
+                        </strong>
+
+                        <button
+                          className={`social-connect-button ${
+                            isConnected
+                              ? "connected"
+                              : ""
+                          }`}
+                          onClick={() =>
+                            connectSocialAccount(
+                              account.name
+                            )
+                          }
+                        >
+
+                          {isConnected ? (
+                            <>
+                              <Check
+                                size={12}
+                              />
+                              Connected
+                            </>
+                          ) : (
+                            <>
+                              <Link2
+                                size={12}
+                              />
+                              Connect
+                            </>
+                          )}
+
+                        </button>
+
+                      </div>
+                    );
+                  }
                 )}
 
               </div>
@@ -1200,7 +1490,7 @@ function App() {
 
             </div>
 
-            {/* AI COMMAND */}
+            {/* AI COMMAND CENTER */}
 
             <div className="dashboard-card command-card">
 
@@ -1213,6 +1503,7 @@ function App() {
                 </div>
 
                 <div>
+
                   <h3>
                     AI Command Center
                   </h3>
@@ -1221,11 +1512,15 @@ function App() {
                     Tell your agent what
                     you want to accomplish.
                   </p>
+
                 </div>
 
                 <div className="command-live">
+
                   <span />
+
                   LIVE
+
                 </div>
 
               </div>
@@ -1237,6 +1532,7 @@ function App() {
                   onChange={(event) =>
                     setCommand(
                       event.target.value
+                        .slice(0, 500)
                     )
                   }
                   placeholder="Tell AutoPilot what you want to create..."
@@ -1257,13 +1553,14 @@ function App() {
                   </span>
 
                   <span>
-                    {command.length}
-                    /500
+                    {command.length}/500
                   </span>
 
                 </div>
 
               </div>
+
+              {/* QUICK ACTIONS */}
 
               <div className="quick-actions">
 
@@ -1272,49 +1569,61 @@ function App() {
                     quickArticle
                   }
                 >
+
                   <PenLine
                     size={14}
                   />
+
                   Write Article
+
                 </button>
 
                 <button
-                  onClick={() => {
-                    setCommand(
-                      "Create a professional image concept for my brand."
-                    );
-                  }}
+                  onClick={() =>
+                    setQuickCommand(
+                      "Create a professional featured image concept for my brand."
+                    )
+                  }
                 >
+
                   <ImagePlus
                     size={14}
                   />
+
                   Create Image
+
                 </button>
 
                 <button
-                  onClick={() => {
-                    setCommand(
+                  onClick={() =>
+                    setQuickCommand(
                       "Create a complete social media campaign for my business."
-                    );
-                  }}
+                    )
+                  }
                 >
+
                   <Share2
                     size={14}
                   />
+
                   Social Campaign
+
                 </button>
 
                 <button
-                  onClick={() => {
-                    setCommand(
+                  onClick={() =>
+                    setQuickCommand(
                       "Research this topic and give me actionable insights."
-                    );
-                  }}
+                    )
+                  }
                 >
+
                   <Search
                     size={14}
                   />
+
                   Research Topic
+
                 </button>
 
               </div>
@@ -1328,11 +1637,16 @@ function App() {
                 onClick={
                   runAgent
                 }
+                disabled={
+                  agentRunning ||
+                  !command.trim()
+                }
               >
 
                 {agentRunning ? (
                   <>
                     <span className="loading-spinner" />
+
                     Agent is working...
                   </>
                 ) : (
@@ -1340,7 +1654,9 @@ function App() {
                     <Sparkles
                       size={16}
                     />
+
                     Run AI Agent
+
                     <ArrowUpRight
                       size={15}
                     />
@@ -1353,9 +1669,13 @@ function App() {
 
           </section>
 
-          {/* LOWER GRID */}
+          {/* =================================================
+              LOWER GRID
+          ================================================= */}
 
           <section className="secondary-grid">
+
+            {/* RECENT CONTENT */}
 
             <div className="dashboard-card content-card">
 
@@ -1383,32 +1703,28 @@ function App() {
                           className={`content-thumbnail ${item.color}`}
                         >
 
-                          {index %
-                            4 ===
+                          {index % 4 ===
                             0 && (
                             <FileText
                               size={17}
                             />
                           )}
 
-                          {index %
-                            4 ===
+                          {index % 4 ===
                             1 && (
                             <Send
                               size={17}
                             />
                           )}
 
-                          {index %
-                            4 ===
+                          {index % 4 ===
                             2 && (
                             <Sparkles
                               size={17}
                             />
                           )}
 
-                          {index %
-                            4 ===
+                          {index % 4 ===
                             3 && (
                             <Globe
                               size={17}
@@ -1443,14 +1759,16 @@ function App() {
                             size={12}
                           />
 
-                          Published
+                          Ready
 
                         </span>
 
                         <button className="more-button">
+
                           <MoreHorizontal
                             size={17}
                           />
+
                         </button>
 
                       </div>
@@ -1465,13 +1783,18 @@ function App() {
                   openArticleGenerator
                 }
               >
+
                 View all content
+
                 <ArrowUpRight
                   size={14}
                 />
+
               </button>
 
             </div>
+
+            {/* CALENDAR */}
 
             <div className="dashboard-card calendar-card">
 
@@ -1489,6 +1812,7 @@ function App() {
                   <strong>
                     8
                   </strong>
+
                   <span>
                     Articles
                   </span>
@@ -1498,6 +1822,7 @@ function App() {
                   <strong>
                     15
                   </strong>
+
                   <span>
                     Social Posts
                   </span>
@@ -1507,6 +1832,7 @@ function App() {
                   <strong>
                     3
                   </strong>
+
                   <span>
                     Scheduled
                   </span>
@@ -1516,6 +1842,7 @@ function App() {
                   <strong>
                     2
                   </strong>
+
                   <span>
                     Drafts
                   </span>
@@ -1527,15 +1854,103 @@ function App() {
 
           </section>
 
-          {/* AGENT STATUS */}
+          {/* =================================================
+              AGENT ACTIVITY
+          ================================================= */}
+
+          <section className="dashboard-card agent-activity-card">
+
+            <div className="card-header">
+
+              <div>
+
+                <h3>
+                  Agent Activity
+                </h3>
+
+                <p>
+                  What AutoPilot has been
+                  doing in your workspace
+                </p>
+
+              </div>
+
+              <div className="activity-live">
+
+                <span />
+
+                LIVE
+
+              </div>
+
+            </div>
+
+            <div className="agent-activity-list">
+
+              {agentActivities
+                .slice(0, 4)
+                .map(
+                  (
+                    activity,
+                    index
+                  ) => (
+                    <div
+                      className="agent-activity-item"
+                      key={
+                        index
+                      }
+                    >
+
+                      <div className="activity-icon">
+                        {
+                          activity.icon
+                        }
+                      </div>
+
+                      <div className="activity-content">
+
+                        <strong>
+                          {
+                            activity.title
+                          }
+                        </strong>
+
+                        <span>
+                          {
+                            activity.text
+                          }
+                        </span>
+
+                      </div>
+
+                      <small>
+                        {
+                          activity.time
+                        }
+                      </small>
+
+                    </div>
+                  )
+                )}
+
+            </div>
+
+          </section>
+
+          {/* =================================================
+              AGENT STATUS
+          ================================================= */}
 
           <section className="agent-status-card">
 
             <div className="agent-status-left">
 
               <div className="large-agent-icon">
+
                 🤖
+
                 <span />
+
               </div>
 
               <div>
@@ -1583,9 +1998,7 @@ function App() {
 
             <div className="agent-task">
 
-              <FileText
-                size={17}
-              />
+              <FileText size={17} />
 
               <div>
 
@@ -1617,11 +2030,15 @@ function App() {
 
       </main>
 
-      {/* ARTICLE MODAL */}
+      {/* =====================================================
+          ARTICLE MODAL
+      ===================================================== */}
 
       {articleModal && (
         <ArticleModal
-          keyword={articleKeyword}
+          keyword={
+            articleKeyword
+          }
           setKeyword={
             setArticleKeyword
           }
@@ -1631,9 +2048,15 @@ function App() {
           setAudience={
             setArticleAudience
           }
-          tone={articleTone}
-          setTone={setArticleTone}
-          length={articleLength}
+          tone={
+            articleTone
+          }
+          setTone={
+            setArticleTone
+          }
+          length={
+            articleLength
+          }
           setLength={
             setArticleLength
           }
@@ -1652,8 +2075,12 @@ function App() {
           result={
             articleResult
           }
-          copied={copied}
-          saved={saved}
+          copied={
+            copied
+          }
+          saved={
+            saved
+          }
           onGenerate={
             generateArticle
           }
@@ -1663,18 +2090,9 @@ function App() {
           onDownload={
             downloadArticle
           }
-          onClose={() => {
-            if (
-              !articleLoading
-            ) {
-              setArticleModal(
-                false
-              );
-              setArticleError(
-                ""
-              );
-            }
-          }}
+          onClose={
+            closeArticleModal
+          }
           onRegenerate={
             generateArticle
           }
@@ -1722,16 +2140,16 @@ function ArticleModal({
         }`}
       >
 
-        {/* HEADER */}
-
         <div className="article-modal-header">
 
           <div className="article-modal-title">
 
             <div className="article-ai-icon">
+
               <Sparkles
                 size={22}
               />
+
             </div>
 
             <div>
@@ -1743,8 +2161,11 @@ function ArticleModal({
                 </h2>
 
                 <span className="ai-ready-badge">
+
                   <span />
+
                   AI READY
+
                 </span>
 
               </div>
@@ -1763,21 +2184,24 @@ function ArticleModal({
             onClick={
               onClose
             }
-            disabled={loading}
+            disabled={
+              loading
+            }
           >
             <X size={20} />
           </button>
 
         </div>
 
-        {/* ERROR */}
-
         {error && (
           <div className="article-error">
+
             <X size={16} />
+
             <span>
               {error}
             </span>
+
           </div>
         )}
 
@@ -1790,12 +2214,15 @@ function ArticleModal({
               <div className="generator-hero">
 
                 <div className="generator-hero-icon">
+
                   <PenLine
                     size={24}
                   />
+
                 </div>
 
                 <div>
+
                   <h3>
                     What do you want to
                     write about?
@@ -1809,6 +2236,7 @@ function ArticleModal({
                     writing and image
                     generation.
                   </p>
+
                 </div>
 
               </div>
@@ -1827,9 +2255,7 @@ function ArticleModal({
 
               <div className="keyword-input">
 
-                <Search
-                  size={18}
-                />
+                <Search size={18} />
 
                 <input
                   value={
@@ -1855,149 +2281,71 @@ function ArticleModal({
 
               <div className="generator-options">
 
-                <div className="form-group">
+                <GeneratorSelect
+                  label="Audience"
+                  value={
+                    audience
+                  }
+                  setValue={
+                    setAudience
+                  }
+                  options={[
+                    "General audience",
+                    "Business owners",
+                    "Entrepreneurs",
+                    "Marketers",
+                    "Beginners",
+                    "Professionals"
+                  ]}
+                />
 
-                  <label>
-                    Audience
-                  </label>
+                <GeneratorSelect
+                  label="Tone"
+                  value={
+                    tone
+                  }
+                  setValue={
+                    setTone
+                  }
+                  options={[
+                    "Professional",
+                    "Friendly",
+                    "Conversational",
+                    "Expert",
+                    "Persuasive"
+                  ]}
+                />
 
-                  <select
-                    value={
-                      audience
-                    }
-                    onChange={(e) =>
-                      setAudience(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option>
-                      General audience
-                    </option>
+                <GeneratorSelect
+                  label="Article Length"
+                  value={
+                    length
+                  }
+                  setValue={
+                    setLength
+                  }
+                  options={[
+                    "Short",
+                    "Medium",
+                    "Long",
+                    "Comprehensive"
+                  ]}
+                />
 
-                    <option>
-                      Business owners
-                    </option>
-
-                    <option>
-                      Entrepreneurs
-                    </option>
-
-                    <option>
-                      Marketers
-                    </option>
-
-                    <option>
-                      Beginners
-                    </option>
-
-                    <option>
-                      Professionals
-                    </option>
-                  </select>
-
-                </div>
-
-                <div className="form-group">
-
-                  <label>
-                    Tone
-                  </label>
-
-                  <select
-                    value={tone}
-                    onChange={(e) =>
-                      setTone(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option>
-                      Professional
-                    </option>
-
-                    <option>
-                      Friendly
-                    </option>
-
-                    <option>
-                      Conversational
-                    </option>
-
-                    <option>
-                      Expert
-                    </option>
-
-                    <option>
-                      Persuasive
-                    </option>
-                  </select>
-
-                </div>
-
-                <div className="form-group">
-
-                  <label>
-                    Article Length
-                  </label>
-
-                  <select
-                    value={length}
-                    onChange={(e) =>
-                      setLength(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option>
-                      Short
-                    </option>
-
-                    <option>
-                      Medium
-                    </option>
-
-                    <option>
-                      Long
-                    </option>
-
-                    <option>
-                      Comprehensive
-                    </option>
-                  </select>
-
-                </div>
-
-                <div className="form-group">
-
-                  <label>
-                    Language
-                  </label>
-
-                  <select
-                    value={
-                      language
-                    }
-                    onChange={(e) =>
-                      setLanguage(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option>
-                      English
-                    </option>
-
-                    <option>
-                      Urdu
-                    </option>
-
-                    <option>
-                      Roman Urdu
-                    </option>
-                  </select>
-
-                </div>
+                <GeneratorSelect
+                  label="Language"
+                  value={
+                    language
+                  }
+                  setValue={
+                    setLanguage
+                  }
+                  options={[
+                    "English",
+                    "Urdu",
+                    "Roman Urdu"
+                  ]}
+                />
 
               </div>
 
@@ -2014,6 +2362,7 @@ function ArticleModal({
                   </div>
 
                   <div>
+
                     <strong>
                       Full SEO Optimization
                     </strong>
@@ -2022,6 +2371,7 @@ function ArticleModal({
                       Complete on-page SEO
                       package
                     </span>
+
                   </div>
 
                   <Check
@@ -2033,45 +2383,29 @@ function ArticleModal({
 
                 <div className="seo-feature-list">
 
-                  <span>
-                    <Check size={13} />
-                    SEO Title
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    Meta Description
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    URL Slug
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    H1 / H2 / H3
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    Focus Keyword
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    Semantic Keywords
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    FAQ Schema Content
-                  </span>
-
-                  <span>
-                    <Check size={13} />
-                    Human Tone
-                  </span>
+                  {[
+                    "SEO Title",
+                    "Meta Description",
+                    "URL Slug",
+                    "H1 / H2 / H3",
+                    "Focus Keyword",
+                    "Semantic Keywords",
+                    "FAQ Schema Content",
+                    "Human Tone"
+                  ].map(
+                    (item) => (
+                      <span
+                        key={
+                          item
+                        }
+                      >
+                        <Check
+                          size={13}
+                        />
+                        {item}
+                      </span>
+                    )
+                  )}
 
                 </div>
 
@@ -2082,9 +2416,11 @@ function ArticleModal({
               <div className="image-feature-box">
 
                 <div className="image-feature-icon">
+
                   <ImagePlus
                     size={18}
                   />
+
                 </div>
 
                 <div>
@@ -2141,10 +2477,18 @@ function ArticleModal({
         {result &&
           !loading && (
             <ArticleResult
-              result={result}
-              copied={copied}
-              saved={saved}
-              onCopy={onCopy}
+              result={
+                result
+              }
+              copied={
+                copied
+              }
+              saved={
+                saved
+              }
+              onCopy={
+                onCopy
+              }
               onDownload={
                 onDownload
               }
@@ -2161,6 +2505,50 @@ function ArticleModal({
 }
 
 /* =========================================================
+   GENERATOR SELECT
+========================================================= */
+
+function GeneratorSelect({
+  label,
+  value,
+  setValue,
+  options
+}) {
+  return (
+    <div className="form-group">
+
+      <label>
+        {label}
+      </label>
+
+      <select
+        value={value}
+        onChange={(e) =>
+          setValue(
+            e.target.value
+          )
+        }
+      >
+
+        {options.map(
+          (option) => (
+            <option
+              key={
+                option
+              }
+            >
+              {option}
+            </option>
+          )
+        )}
+
+      </select>
+
+    </div>
+  );
+}
+
+/* =========================================================
    GENERATING
 ========================================================= */
 
@@ -2169,11 +2557,13 @@ function ArticleGenerating() {
     <div className="article-generating">
 
       <div className="generating-orb">
+
         <div>
           <Sparkles
             size={32}
           />
         </div>
+
       </div>
 
       <h2>
@@ -2190,6 +2580,7 @@ function ArticleGenerating() {
       <div className="generation-steps">
 
         <div className="generation-step active">
+
           <div>
             <Check size={14} />
           </div>
@@ -2197,9 +2588,11 @@ function ArticleGenerating() {
           <span>
             Analyzing keyword
           </span>
+
         </div>
 
         <div className="generation-step active">
+
           <div>
             <Check size={14} />
           </div>
@@ -2207,9 +2600,11 @@ function ArticleGenerating() {
           <span>
             Building SEO structure
           </span>
+
         </div>
 
         <div className="generation-step active">
+
           <div>
             <RefreshCw
               size={14}
@@ -2220,22 +2615,28 @@ function ArticleGenerating() {
           <span>
             Writing article
           </span>
+
         </div>
 
         <div className="generation-step">
+
           <div />
+
           <span>
             Generating featured image
           </span>
+
         </div>
 
       </div>
 
       <div className="generation-note">
+
         <Zap size={14} />
 
         AutoPilot is creating
         your complete SEO package.
+
       </div>
 
     </div>
@@ -2255,50 +2656,58 @@ function ArticleResult({
   onRegenerate
 }) {
   const article =
-    normalizeArticle(result);
+    normalizeArticle(
+      result
+    );
 
   return (
     <div className="article-result">
 
-      {/* =================================================
-          PROFESSIONAL ARTICLE HERO
-      ================================================= */}
-
       <div className="article-document">
+
+        {/* TOP */}
 
         <div className="article-top-bar">
 
           <div className="article-brand-small">
+
             <Sparkles
               size={14}
             />
 
             AutoPilot AI
+
           </div>
 
           <div className="article-status-right">
 
             {saved && (
               <span className="saved-badge">
+
                 <CheckCircle2
                   size={13}
                 />
+
                 Saved
+
               </span>
             )}
 
             <span className="publication-badge">
+
               <CheckCircle2
                 size={13}
               />
+
               Publication Ready
+
             </span>
 
           </div>
 
         </div>
 
-        {/* SEO HEADER */}
+        {/* HEADER */}
 
         <div className="article-document-header">
 
@@ -2312,37 +2721,50 @@ function ArticleResult({
 
           {article.excerpt && (
             <p className="article-excerpt">
-              {article.excerpt}
+              {
+                article.excerpt
+              }
             </p>
           )}
 
           <div className="professional-meta">
 
             <span>
+
               <Target
                 size={14}
               />
 
-              {article.focusKeyword}
+              {
+                article.focusKeyword
+              }
+
             </span>
 
             <span>
+
               <AlignLeft
                 size={14}
               />
 
-              {article.wordCount}
-              {" "}
+              {
+                article.wordCount
+              }{" "}
               words
+
             </span>
 
             {article.searchIntent && (
               <span>
+
                 <Search
                   size={14}
                 />
 
-                {article.searchIntent}
+                {
+                  article.searchIntent
+                }
+
               </span>
             )}
 
@@ -2350,7 +2772,7 @@ function ArticleResult({
 
         </div>
 
-        {/* FEATURED IMAGE */}
+        {/* IMAGE */}
 
         {article.imageUrl ? (
           <div className="professional-featured-image">
@@ -2365,11 +2787,13 @@ function ArticleResult({
             />
 
             <div className="featured-image-badge">
+
               <ImageIcon
                 size={14}
               />
 
               AI Generated Featured Image
+
             </div>
 
           </div>
@@ -2393,13 +2817,16 @@ function ArticleResult({
           </div>
         )}
 
-        {/* SEO PANEL */}
+        {/* SEO */}
 
         <div className="seo-dashboard">
 
           <div className="seo-dashboard-title">
+
             <Target size={17} />
+
             SEO Optimization
+
           </div>
 
           <div className="seo-grid">
@@ -2423,7 +2850,9 @@ function ArticleResult({
               </span>
 
               <strong>
-                {article.metaDescription}
+                {
+                  article.metaDescription
+                }
               </strong>
 
               <small>
@@ -2456,7 +2885,9 @@ function ArticleResult({
               </span>
 
               <strong>
-                {article.focusKeyword}
+                {
+                  article.focusKeyword
+                }
               </strong>
 
             </div>
@@ -2484,11 +2915,13 @@ function ArticleResult({
                       }
                       className="keyword-pill"
                     >
+
                       <Hash
                         size={11}
                       />
 
                       {keyword}
+
                     </span>
                   )
                 )}
@@ -2500,11 +2933,9 @@ function ArticleResult({
 
         </div>
 
-        {/* ARTICLE CONTENT */}
+        {/* CONTENT */}
 
         <article className="professional-article-content">
-
-          {/* INTRODUCTION */}
 
           {article.introduction && (
             <section className="article-introduction">
@@ -2522,16 +2953,14 @@ function ArticleResult({
             </section>
           )}
 
-          {/* SECTIONS */}
-
           {article.sections.map(
             (
               section,
-              sectionIndex
+              index
             ) => (
               <ArticleSection
                 key={
-                  sectionIndex
+                  index
                 }
                 section={
                   section
@@ -2539,8 +2968,6 @@ function ArticleResult({
               />
             )
           )}
-
-          {/* FAQ */}
 
           {article.faq.length >
             0 && (
@@ -2568,6 +2995,7 @@ function ArticleResult({
                   >
 
                     <h3>
+
                       <span>
                         Q
                       </span>
@@ -2575,6 +3003,7 @@ function ArticleResult({
                       {
                         item.question
                       }
+
                     </h3>
 
                     <p>
@@ -2589,8 +3018,6 @@ function ArticleResult({
 
             </section>
           )}
-
-          {/* CONCLUSION */}
 
           {article.conclusion && (
             <section className="article-conclusion">
@@ -2614,16 +3041,18 @@ function ArticleResult({
 
         </article>
 
-        {/* ARTICLE FOOTER */}
+        {/* FOOTER */}
 
         <div className="article-document-footer">
 
           <div className="article-generated-by">
 
             <div className="small-ai-icon">
+
               <Sparkles
                 size={14}
               />
+
             </div>
 
             <div>
@@ -2758,15 +3187,19 @@ function ArticleSection({
                     index
                   }
                 >
+
                   <span className="bullet-check">
+
                     <Check
                       size={13}
                     />
+
                   </span>
 
                   <span>
                     {bullet}
                   </span>
+
                 </li>
               )
             )}
@@ -2820,8 +3253,7 @@ function ArticleSection({
               {Array.isArray(
                 subsection.bullets
               ) &&
-                subsection.bullets
-                  .length >
+                subsection.bullets.length >
                   0 && (
                   <ul className="article-bullet-list">
 
@@ -2837,9 +3269,11 @@ function ArticleSection({
                         >
 
                           <span className="bullet-check">
+
                             <Check
                               size={13}
                             />
+
                           </span>
 
                           <span>
@@ -2864,7 +3298,7 @@ function ArticleSection({
 }
 
 /* =========================================================
-   NORMALIZE ARTICLE
+   NORMALIZE
 ========================================================= */
 
 function normalizeArticle(
@@ -3029,6 +3463,7 @@ function calculateArticleWords(
             }
           );
         }
+
       }
     );
   }
@@ -3040,11 +3475,13 @@ function calculateArticleWords(
   ) {
     article.faq.forEach(
       (item) => {
+
         text +=
           ` ${item?.question || ""}`;
 
         text +=
           ` ${item?.answer || ""}`;
+
       }
     );
   }
@@ -3057,7 +3494,7 @@ function calculateArticleWords(
 }
 
 /* =========================================================
-   ARTICLE TO PLAIN TEXT
+   PLAIN TEXT
 ========================================================= */
 
 function articleToPlainText(
@@ -3077,6 +3514,7 @@ function articleToPlainText(
     lines.push(
       `Meta Description: ${article.metaDescription}`
     );
+
     lines.push("");
   }
 
@@ -3086,6 +3524,7 @@ function articleToPlainText(
     lines.push(
       `Focus Keyword: ${article.focusKeyword}`
     );
+
     lines.push("");
   }
 
@@ -3106,10 +3545,11 @@ function articleToPlainText(
   article.sections?.forEach(
     (section) => {
 
-      lines.push(
-        section.heading ||
-          ""
-      );
+      if (section.heading) {
+        lines.push(
+          section.heading
+        );
+      }
 
       section.paragraphs?.forEach(
         (paragraph) =>
@@ -3128,10 +3568,13 @@ function articleToPlainText(
       section.subsections?.forEach(
         (subsection) => {
 
-          lines.push(
-            subsection.heading ||
-              ""
-          );
+          if (
+            subsection.heading
+          ) {
+            lines.push(
+              subsection.heading
+            );
+          }
 
           subsection.paragraphs?.forEach(
             (paragraph) =>
@@ -3151,6 +3594,7 @@ function articleToPlainText(
       );
 
       lines.push("");
+
     }
   );
 
@@ -3190,7 +3634,9 @@ function articleToPlainText(
     );
   }
 
-  return lines.join("\n");
+  return lines.join(
+    "\n"
+  );
 }
 
 /* =========================================================
@@ -3246,7 +3692,9 @@ function StatCard({
             index
           ) => (
             <i
-              key={index}
+              key={
+                index
+              }
               style={{
                 height:
                   `${height}%`
@@ -3358,7 +3806,9 @@ function MiniCalendar() {
         ].map(
           (day) => (
             <span
-              key={day}
+              key={
+                day
+              }
             >
               {day}
             </span>
@@ -3376,7 +3826,8 @@ function MiniCalendar() {
           ) => {
 
             const isToday =
-              day === "26";
+              day ===
+              "26";
 
             return (
               <div
