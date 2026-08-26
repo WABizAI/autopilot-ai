@@ -632,9 +632,8 @@ function App() {
       }
 
       const imageUrl =
-        convertGeneratedImage(
-          data?.image
-        );
+  data?.imageUrl ||
+  convertGeneratedImage(data?.image);
 
       const normalizedArticle = {
         ...article,
