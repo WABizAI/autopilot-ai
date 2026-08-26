@@ -46,12 +46,11 @@ export default async function handler(req, res) {
     // =====================================================
 
     const articlePrompt = `
-You are AutoPilot AI, an elite SEO strategist,
-professional editor, research-minded content writer,
-and digital publishing expert.
+You are an elite SEO strategist, professional editor,
+research-minded content writer and digital publishing expert.
 
-Create a publication-ready article that looks and reads
-like it was written by a highly experienced human writer.
+Create a publication-ready article that feels like it was
+written by an experienced professional human writer.
 
 TARGET KEYWORD:
 ${cleanKeyword}
@@ -66,9 +65,10 @@ ${tone}
 WRITING QUALITY
 =====================================================
 
+Write genuinely useful content for real readers.
+
 The article must:
 
-- Be genuinely useful to the reader.
 - Clearly satisfy the search intent.
 - Explain concepts instead of making vague statements.
 - Use natural human writing.
@@ -80,6 +80,8 @@ The article must:
 - Use specific examples where useful.
 - Give actionable advice.
 - Maintain a professional editorial standard.
+- Use natural transitions between sections.
+- Give practical information instead of generic statements.
 
 DO NOT mention:
 
@@ -120,7 +122,7 @@ SEO REQUIREMENTS
 14. Include actionable recommendations.
 15. Include bullet lists where useful.
 16. Include numbered lists where useful.
-17. Include a detailed FAQ section.
+17. Include exactly 6 useful FAQ questions.
 18. Write a strong conclusion.
 19. Create a detailed professional image prompt.
 20. Target approximately 1800-2500 words.
@@ -129,11 +131,11 @@ SEO REQUIREMENTS
 ARTICLE QUALITY
 =====================================================
 
-The introduction should:
+The introduction must:
 
 - Clearly explain the topic.
 - Address the reader's problem.
-- Tell the reader what they will learn.
+- Explain what the reader will learn.
 - Naturally include the primary keyword.
 
 Each H2 section must contain:
@@ -141,12 +143,15 @@ Each H2 section must contain:
 - A meaningful heading.
 - Multiple useful paragraphs.
 - Practical information.
-- Bullets or numbered points where appropriate.
+- Examples where appropriate.
+- Bullets or numbered points where useful.
 - H3 subsections where they genuinely improve readability.
 
 Do not create empty sections.
 
-Every section must contain real useful content.
+Do not create filler content.
+
+Do not repeat the same information across sections.
 
 FAQ:
 
@@ -154,8 +159,8 @@ Create exactly 6 useful questions and detailed answers.
 
 IMAGE PROMPT:
 
-Create a detailed image-generation prompt based on the
-actual article topic.
+Create a detailed professional image-generation prompt
+based on the actual article topic.
 
 The image prompt should describe:
 
@@ -168,14 +173,21 @@ The image prompt should describe:
 - mood
 - perspective
 
-Do NOT ask the image model to put text, logos,
-watermarks, titles or UI elements inside the image.
+Do NOT ask the image model to put:
+
+- text
+- logos
+- watermarks
+- titles
+- UI elements
+
+inside the image.
 
 =====================================================
 RETURN JSON ONLY
 =====================================================
 
-Return valid JSON.
+Return valid JSON only.
 
 Do not use markdown.
 
@@ -224,6 +236,10 @@ Use EXACTLY this structure:
 
     console.log("Starting article generation...");
 
+    // =====================================================
+    // GEMINI ARTICLE REQUEST
+    // =====================================================
+
     const articleResponse = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
         encodeURIComponent(geminiKey),
@@ -270,6 +286,10 @@ Use EXACTLY this structure:
       });
     }
 
+    // =====================================================
+    // EXTRACT ARTICLE TEXT
+    // =====================================================
+
     const articleText =
       articleData?.candidates?.[0]?.content?.parts
         ?.map((part) => part.text || "")
@@ -280,6 +300,10 @@ Use EXACTLY this structure:
         error: "AI returned an empty article."
       });
     }
+
+    // =====================================================
+    // PARSE ARTICLE JSON
+    // =====================================================
 
     let article;
 
@@ -310,7 +334,7 @@ Use EXACTLY this structure:
     const imagePrompt =
       article.imagePrompt ||
       `
-Create a premium professional editorial photograph
+Create a premium professional editorial featured image
 for a high-quality online article.
 
 Article topic:
@@ -319,8 +343,8 @@ ${cleanKeyword}
 Article title:
 ${article.title || cleanKeyword}
 
-Create a visually compelling scene that directly
-represents the article topic.
+Create a visually compelling scene that directly represents
+the article topic.
 
 Style:
 
@@ -329,19 +353,19 @@ Style:
 - modern
 - sophisticated
 - professional
-- cinematic natural lighting
+- natural cinematic lighting
 - realistic materials
 - realistic depth
 - strong composition
-- high-end business publication quality
+- high-end publication quality
 
 Composition:
 
 - wide landscape composition
 - clear main subject
 - strong visual hierarchy
-- natural depth of field
 - professional camera perspective
+- natural depth of field
 - balanced composition
 
 Mood:
@@ -373,139 +397,84 @@ Create a professional blog featured image.
         "Starting Hugging Face image generation..."
       );
 
-      /*
-      IMPORTANT:
+      // ===================================================
+      // HUGGING FACE CLIENT
+      // ===================================================
 
-      Hugging Face Inference Providers supports text-to-image.
-      We use the fal-ai provider through the HF router.
+      const hf = new InferenceClient({
+        provider: "fal-ai",
+        apiKey: hfToken
+      });
 
-      Model:
-      black-forest-labs/FLUX.1-dev
-      */
+      // ===================================================
+      // GENERATE IMAGE
+      // ===================================================
 
-      const imageResponse = await fetch(
-        "https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-dev",
-        {
-          method: "POST",
+      const generatedImage =
+        await hf.textToImage(
+          imagePrompt,
+          {
+            model:
+              "black-forest-labs/FLUX.1-dev",
 
-// =====================================================
-// STEP 2 — HUGGING FACE FEATURED IMAGE
-// =====================================================
+            num_inference_steps: 4,
 
-let image = null;
+            width: 1344,
 
-const imagePrompt =
-  article.imagePrompt ||
-  `
-Create a premium professional editorial featured image.
+            height: 768
+          }
+        );
 
-Article topic:
-${cleanKeyword}
+      // ===================================================
+      // CONVERT IMAGE TO BASE64
+      // ===================================================
 
-Article title:
-${article.title || cleanKeyword}
+      const imageBuffer =
+        Buffer.from(
+          await generatedImage.arrayBuffer()
+        );
 
-Create a visually compelling scene that directly represents
-the article topic.
+      if (imageBuffer.length > 0) {
+        image = {
+          mimeType:
+            generatedImage.type ||
+            "image/png",
 
-Style:
-- photorealistic
-- premium editorial photography
-- modern
-- sophisticated
-- professional
-- natural cinematic lighting
-- realistic materials
-- realistic depth
-- strong composition
-- high-end publication quality
+          data:
+            imageBuffer.toString("base64")
+        };
 
-Composition:
-- wide landscape composition
-- clear main subject
-- strong visual hierarchy
-- professional camera perspective
-- natural depth of field
-- balanced composition
+        console.log(
+          "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+        );
 
-Do NOT include:
-- text
-- letters
-- words
-- logos
-- watermarks
-- UI
-- screenshots
-- fake interfaces
-- distorted objects
-- duplicated objects
-`;
+        console.log(
+          "IMAGE MIME TYPE:",
+          image.mimeType
+        );
 
-try {
-  console.log(
-    "Starting Hugging Face image generation..."
-  );
-
-  const hf = new InferenceClient(
-    process.env.HF_TOKEN
-  );
-
-  const generatedImage =
-    await hf.textToImage({
-      provider: "fal-ai",
-
-      model:
-        "black-forest-labs/FLUX.1-dev",
-
-      inputs: imagePrompt,
-
-      parameters: {
-        width: 1344,
-        height: 768,
-        num_inference_steps: 4
+        console.log(
+          "IMAGE SIZE:",
+          imageBuffer.length
+        );
+      } else {
+        console.error(
+          "HUGGING FACE RETURNED EMPTY IMAGE"
+        );
       }
-    });
 
-  /*
-   * Hugging Face returns a Blob for text-to-image.
-   * Convert it into base64 so the frontend can display it.
-   */
+    } catch (imageError) {
 
-  const imageBuffer =
-    Buffer.from(
-      await generatedImage.arrayBuffer()
-    );
+      console.error(
+        "HUGGING FACE IMAGE GENERATION FAILED:"
+      );
 
-  if (imageBuffer.length > 0) {
-    image = {
-      mimeType:
-        generatedImage.type ||
-        "image/png",
+      console.error(
+        imageError?.message ||
+        imageError
+      );
 
-      data:
-        imageBuffer.toString("base64")
-    };
-
-    console.log(
-      "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
-    );
-  } else {
-    console.error(
-      "HUGGING FACE RETURNED EMPTY IMAGE"
-    );
-  }
-
-} catch (imageError) {
-
-  console.error(
-    "HUGGING FACE IMAGE GENERATION FAILED:"
-  );
-
-  console.error(
-    imageError?.message ||
-    imageError
-  );
-}
+    }
 
     // =====================================================
     // STEP 3 — WORD COUNT
@@ -598,6 +567,7 @@ try {
     });
 
   } catch (error) {
+
     console.error(
       "ARTICLE API ERROR:",
       error
