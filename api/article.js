@@ -370,10 +370,9 @@ Do NOT include:
       // HUGGING FACE CLIENT
       // ===================================================
 
-      const hf = new InferenceClient({
-        provider: "fal-ai",
-        apiKey: hfToken
-      });
+      const hf = new InferenceClient(hfToken, {
+  provider: "fal-ai"
+});
 
       console.log(
         "HF provider: fal-ai"
