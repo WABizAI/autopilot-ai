@@ -6,8 +6,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { keyword, language = "English", tone = "Professional" } =
-      req.body || {};
+    const {
+      keyword,
+      language = "English",
+      tone = "Professional"
+    } = req.body || {};
 
     if (!keyword || !keyword.trim()) {
       return res.status(400).json({
@@ -23,19 +26,22 @@ export default async function handler(req, res) {
       });
     }
 
+    const cleanKeyword = keyword.trim();
+
     /*
-     * ============================
-     * STEP 1 — GENERATE ARTICLE
-     * ============================
-     */
+    =========================================================
+    STEP 1 — PROFESSIONAL SEO ARTICLE
+    =========================================================
+    */
 
     const articlePrompt = `
-You are AutoPilot AI, an advanced professional SEO content strategist.
+You are AutoPilot AI, an elite SEO strategist, professional
+editor, content writer and digital marketing expert.
 
-Create a high-quality, publication-ready SEO article.
+Create a completely publication-ready article.
 
 TARGET KEYWORD:
-${keyword}
+${cleanKeyword}
 
 LANGUAGE:
 ${language}
@@ -43,49 +49,91 @@ ${language}
 TONE:
 ${tone}
 
-IMPORTANT REQUIREMENTS:
+IMPORTANT:
 
-1. Write like a professional human writer.
-2. Do NOT mention AI, Gemini, prompts, or content generation.
-3. Do NOT use markdown symbols such as ###, **, ## or ---.
-4. Return clean structured JSON only.
-5. Create a strong SEO title.
-6. Create an SEO meta description between 140-160 characters.
-7. Create an SEO-friendly URL slug.
-8. Provide one primary focus keyword.
-9. Provide 5-10 secondary keywords.
-10. Create a compelling introduction.
-11. Use logical H2 and H3 headings.
-12. Make headings meaningful and keyword relevant.
-13. Use short paragraphs.
-14. Use bullet points where useful.
-15. Use numbered lists where useful.
-16. Naturally use the target keyword without keyword stuffing.
-17. Include semantic/related keywords.
-18. Include an FAQ section.
-19. Include a conclusion.
-20. Include a suggested featured image prompt.
-21. Make the article comprehensive and useful.
-22. Avoid fake statistics and unsupported claims.
-23. Aim for approximately 1500-2200 words.
+Write a genuinely useful article for real readers.
 
-SEO STRUCTURE:
+DO NOT mention:
+- AI
+- Gemini
+- prompts
+- content generation
+- this instruction
+- being an AI
 
-- SEO title
-- Meta description
-- URL slug
-- Focus keyword
-- Secondary keywords
-- Search intent
-- Article introduction
-- Multiple H2 sections
-- H3 subsections where useful
-- Lists
-- FAQ
-- Conclusion
-- Featured image prompt
+The article must feel professionally written by an experienced
+human SEO writer.
 
-Return JSON in exactly this structure:
+SEO REQUIREMENTS:
+
+1. Create an attractive SEO title.
+2. Title should naturally include the primary keyword.
+3. Meta description must be 140-160 characters.
+4. Create an SEO-friendly URL slug.
+5. Provide one focus keyword.
+6. Provide 8-12 secondary keywords.
+7. Identify search intent.
+8. Write a compelling introduction.
+9. Create multiple H2 sections.
+10. Add H3 subsections where useful.
+11. Use short readable paragraphs.
+12. Use bullet lists where useful.
+13. Use numbered lists where useful.
+14. Naturally include semantic keywords.
+15. Avoid keyword stuffing.
+16. Add practical examples.
+17. Add an FAQ section.
+18. Add a strong conclusion.
+19. Create a professional featured-image prompt.
+20. Target approximately 1800-2500 words.
+21. Never invent statistics.
+22. Never make unsupported factual claims.
+23. Make the article useful enough to publish directly.
+
+STRUCTURE:
+
+SEO INFORMATION
+- title
+- metaDescription
+- slug
+- focusKeyword
+- secondaryKeywords
+- searchIntent
+- excerpt
+
+ARTICLE
+- introduction
+- sections
+- faq
+- conclusion
+
+IMAGE
+- imagePrompt
+
+For every H2 section:
+
+{
+  "heading": "",
+  "level": 2,
+  "paragraphs": [],
+  "bullets": [],
+  "subsections": [
+    {
+      "heading": "",
+      "level": 3,
+      "paragraphs": [],
+      "bullets": []
+    }
+  ]
+}
+
+IMPORTANT:
+Return JSON only.
+Do not wrap JSON in markdown.
+Do not use ###, ##, ** or ---.
+Do not put markdown heading symbols inside the content.
+
+RETURN EXACTLY THIS JSON STRUCTURE:
 
 {
   "title": "",
@@ -96,27 +144,8 @@ Return JSON in exactly this structure:
   "searchIntent": "",
   "excerpt": "",
   "introduction": "",
-  "sections": [
-    {
-      "heading": "",
-      "level": 2,
-      "paragraphs": [],
-      "bullets": [],
-      "subsections": [
-        {
-          "heading": "",
-          "paragraphs": [],
-          "bullets": []
-        }
-      ]
-    }
-  ],
-  "faq": [
-    {
-      "question": "",
-      "answer": ""
-    }
-  ],
+  "sections": [],
+  "faq": [],
   "conclusion": "",
   "imagePrompt": "",
   "wordCount": 0
@@ -143,8 +172,8 @@ Return JSON in exactly this structure:
             }
           ],
           generationConfig: {
-            temperature: 0.65,
-            maxOutputTokens: 8000,
+            temperature: 0.55,
+            maxOutputTokens: 12000,
             responseMimeType: "application/json"
           }
         })
@@ -154,7 +183,7 @@ Return JSON in exactly this structure:
     const articleData = await articleResponse.json();
 
     if (!articleResponse.ok) {
-      console.error("Article Gemini error:", articleData);
+      console.error("ARTICLE GEMINI ERROR:", articleData);
 
       return res.status(articleResponse.status).json({
         error:
@@ -178,9 +207,9 @@ Return JSON in exactly this structure:
 
     try {
       article = JSON.parse(articleText);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Raw AI response:", articleText);
+    } catch (error) {
+      console.error("ARTICLE JSON ERROR:", error);
+      console.error("RAW RESPONSE:", articleText);
 
       return res.status(502).json({
         error: "AI returned invalid article data."
@@ -188,16 +217,52 @@ Return JSON in exactly this structure:
     }
 
     /*
-     * ============================
-     * STEP 2 — GENERATE IMAGE
-     * ============================
-     */
+    =========================================================
+    STEP 2 — PROFESSIONAL FEATURED IMAGE
+    =========================================================
+    */
 
     let image = null;
 
+    const imagePrompt =
+      article.imagePrompt ||
+      `
+Create a premium professional editorial featured image
+for a business website article.
+
+Topic:
+${cleanKeyword}
+
+Article title:
+${article.title || cleanKeyword}
+
+Style:
+- modern
+- premium
+- realistic
+- professional
+- editorial
+- clean composition
+- high-end business publication
+- visually relevant to the topic
+- strong depth
+- professional lighting
+- suitable for a blog featured image
+
+Aspect ratio:
+16:9
+
+Do not include:
+- logos
+- watermark
+- random text
+- distorted objects
+- unnecessary UI
+`;
+
     try {
       const imageResponse = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" +
+        "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent?key=" +
           encodeURIComponent(apiKey),
         {
           method: "POST",
@@ -210,15 +275,19 @@ Return JSON in exactly this structure:
                 role: "user",
                 parts: [
                   {
-                    text:
-                      article.imagePrompt ||
-                      `Create a professional editorial featured image for an article about ${keyword}. Modern, clean, premium, realistic, no logos, no watermark text, suitable for a professional business website.`
+                    text: imagePrompt
                   }
                 ]
               }
             ],
             generationConfig: {
-              responseModalities: ["IMAGE"]
+              responseModalities: ["TEXT", "IMAGE"],
+              responseFormat: {
+                image: {
+                  aspectRatio: "16:9",
+                  imageSize: "1K"
+                }
+              }
             }
           })
         }
@@ -226,12 +295,18 @@ Return JSON in exactly this structure:
 
       const imageData = await imageResponse.json();
 
-      if (imageResponse.ok) {
+      if (!imageResponse.ok) {
+        console.error(
+          "IMAGE GENERATION ERROR:",
+          imageData
+        );
+      } else {
         const parts =
           imageData?.candidates?.[0]?.content?.parts || [];
 
         const imagePart = parts.find(
-          (part) => part?.inlineData?.data
+          (part) =>
+            part?.inlineData?.data
         );
 
         if (imagePart) {
@@ -239,30 +314,80 @@ Return JSON in exactly this structure:
             mimeType:
               imagePart.inlineData.mimeType ||
               "image/png",
-            data: imagePart.inlineData.data
+
+            data:
+              imagePart.inlineData.data
           };
         }
-      } else {
-        console.error("Image generation error:", imageData);
       }
     } catch (imageError) {
-      console.error("Image generation failed:", imageError);
+      console.error(
+        "IMAGE GENERATION FAILED:",
+        imageError
+      );
     }
 
     /*
-     * ============================
-     * STEP 3 — RETURN EVERYTHING
-     * ============================
-     */
+    =========================================================
+    STEP 3 — WORD COUNT
+    =========================================================
+    */
+
+    const allText = [
+      article.introduction || "",
+      ...(article.sections || []).flatMap((section) => [
+        section.heading || "",
+        ...(section.paragraphs || []),
+        ...(section.bullets || []),
+        ...(section.subsections || []).flatMap(
+          (subsection) => [
+            subsection.heading || "",
+            ...(subsection.paragraphs || []),
+            ...(subsection.bullets || [])
+          ]
+        )
+      ]),
+      ...(article.faq || []).flatMap((item) => [
+        item.question || "",
+        item.answer || ""
+      ]),
+      article.conclusion || ""
+    ].join(" ");
+
+    const calculatedWordCount =
+      allText
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .length;
+
+    /*
+    =========================================================
+    STEP 4 — FINAL RESPONSE
+    =========================================================
+    */
 
     return res.status(200).json({
       success: true,
-      article,
-      image
+
+      article: {
+        ...article,
+        wordCount:
+          calculatedWordCount || article.wordCount || 0
+      },
+
+      image,
+
+      imageUrl: image
+        ? `data:${image.mimeType};base64,${image.data}`
+        : null
     });
 
   } catch (error) {
-    console.error("Article API error:", error);
+    console.error(
+      "ARTICLE API ERROR:",
+      error
+    );
 
     return res.status(500).json({
       error:
