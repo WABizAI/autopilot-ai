@@ -9,9 +9,7 @@ export default async function handler(req, res) {
     const {
       keyword,
       language = "English",
-      tone = "Professional",
-      audience = "General audience",
-      length = "Long"
+      tone = "Professional"
     } = req.body || {};
 
     if (!keyword || !keyword.trim()) {
@@ -30,15 +28,15 @@ export default async function handler(req, res) {
 
     const cleanKeyword = keyword.trim();
 
-    /* =====================================================
-       STEP 1 — ARTICLE
-    ===================================================== */
+    // =====================================================
+    // STEP 1 — ARTICLE GENERATION
+    // =====================================================
 
     const articlePrompt = `
-You are AutoPilot AI, an elite SEO strategist, professional
-editor and expert content writer.
+You are AutoPilot AI, a professional SEO content strategist,
+editor and human-quality article writer.
 
-Create a publication-ready article.
+Create a publication-ready SEO article about:
 
 TARGET KEYWORD:
 ${cleanKeyword}
@@ -46,56 +44,52 @@ ${cleanKeyword}
 LANGUAGE:
 ${language}
 
-AUDIENCE:
-${audience}
-
 TONE:
 ${tone}
 
-ARTICLE LENGTH:
-${length}
+IMPORTANT WRITING RULES:
+
+- Write for real human readers.
+- Make the article genuinely useful and actionable.
+- Do not mention AI, Gemini, prompts, content generation,
+  or these instructions.
+- Do not use fake statistics.
+- Do not invent sources or facts.
+- Avoid keyword stuffing.
+- Use natural semantic keywords.
+- Use clear, professional language.
+- Make the article feel like it was written by an experienced
+  professional editor.
+
+ARTICLE REQUIREMENTS:
+
+1. Create a strong SEO title containing the primary keyword.
+2. Create a meta description between 140 and 160 characters.
+3. Create a clean SEO URL slug.
+4. Provide one focus keyword.
+5. Provide 8-12 secondary keywords.
+6. Identify search intent.
+7. Write a strong introduction.
+8. Create 6-8 detailed H2 sections.
+9. Add H3 subsections where useful.
+10. Each major section must contain useful paragraphs.
+11. Use bullet lists where useful.
+12. Use numbered lists where useful.
+13. Include practical examples.
+14. Include actionable advice.
+15. Include an FAQ section with 6 questions.
+16. Write a useful conclusion.
+17. Create a professional featured-image prompt.
+18. Target approximately 1800-2500 words.
 
 IMPORTANT:
+Every section must contain real content.
 
-Write genuinely useful content for real readers.
-
-Do not mention:
-- AI
-- Gemini
-- prompts
-- content generation
-- these instructions
-
-The article should feel professionally written by an
-experienced human writer.
-
-SEO REQUIREMENTS:
-
-1. Attractive SEO title.
-2. Include the primary keyword naturally.
-3. Meta description 140-160 characters.
-4. SEO-friendly URL slug.
-5. Focus keyword.
-6. 8-12 secondary keywords.
-7. Search intent.
-8. Compelling introduction.
-9. Multiple H2 sections.
-10. H3 subsections where useful.
-11. Short readable paragraphs.
-12. Useful bullet lists.
-13. Useful numbered lists.
-14. Semantic keywords.
-15. No keyword stuffing.
-16. Practical examples.
-17. FAQ section.
-18. Strong conclusion.
-19. Professional featured-image prompt.
-20. Never invent statistics.
-21. Never make unsupported factual claims.
+Do NOT create empty arrays just to fill the structure.
 
 Return JSON only.
 
-EXACT JSON:
+Use EXACTLY this structure:
 
 {
   "title": "",
@@ -106,8 +100,28 @@ EXACT JSON:
   "searchIntent": "",
   "excerpt": "",
   "introduction": "",
-  "sections": [],
-  "faq": [],
+  "sections": [
+    {
+      "heading": "",
+      "level": 2,
+      "paragraphs": [],
+      "bullets": [],
+      "subsections": [
+        {
+          "heading": "",
+          "level": 3,
+          "paragraphs": [],
+          "bullets": []
+        }
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "question": "",
+      "answer": ""
+    }
+  ],
   "conclusion": "",
   "imagePrompt": "",
   "wordCount": 0
@@ -135,15 +149,14 @@ EXACT JSON:
           ],
           generationConfig: {
             temperature: 0.55,
-            maxOutputTokens: 12000,
+            maxOutputTokens: 16000,
             responseMimeType: "application/json"
           }
         })
       }
     );
 
-    const articleData =
-      await articleResponse.json();
+    const articleData = await articleResponse.json();
 
     if (!articleResponse.ok) {
       console.error(
@@ -151,9 +164,7 @@ EXACT JSON:
         articleData
       );
 
-      return res.status(
-        articleResponse.status
-      ).json({
+      return res.status(500).json({
         error:
           articleData?.error?.message ||
           "Article generation failed."
@@ -161,53 +172,47 @@ EXACT JSON:
     }
 
     const articleText =
-      articleData?.candidates?.[0]
-        ?.content?.parts
-        ?.map(
-          (part) => part.text || ""
-        )
+      articleData?.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text || "")
         .join("") || "";
 
     if (!articleText) {
       return res.status(502).json({
-        error:
-          "AI returned an empty article."
+        error: "AI returned an empty article."
       });
     }
 
     let article;
 
     try {
-      article =
-        JSON.parse(articleText);
-    } catch (error) {
+      article = JSON.parse(articleText);
+    } catch (jsonError) {
       console.error(
-        "ARTICLE JSON ERROR:",
-        error
+        "ARTICLE JSON PARSE ERROR:",
+        jsonError
       );
 
       console.error(
-        "RAW RESPONSE:",
+        "RAW ARTICLE RESPONSE:",
         articleText
       );
 
       return res.status(502).json({
-        error:
-          "AI returned invalid article data."
+        error: "AI returned invalid article JSON."
       });
     }
 
-    /* =====================================================
-       STEP 2 — IMAGE GENERATION
-    ===================================================== */
+    // =====================================================
+    // STEP 2 — FEATURED IMAGE GENERATION
+    // =====================================================
 
     let image = null;
 
     const imagePrompt =
       article.imagePrompt ||
       `
-Create a premium editorial featured image
-for a professional business blog.
+Create a premium editorial featured image for a professional
+business article.
 
 Topic:
 ${cleanKeyword}
@@ -215,81 +220,61 @@ ${cleanKeyword}
 Article title:
 ${article.title || cleanKeyword}
 
-Visual direction:
+Visual style:
 
 - premium
 - realistic
 - modern
 - professional
-- editorial photography
+- editorial
+- sophisticated
 - clean composition
-- sophisticated lighting
-- strong visual hierarchy
-- relevant objects and environment
-- high-end business publication quality
-- visually interesting
-- no unnecessary text
-
-The image must visually represent the article topic.
+- cinematic lighting
+- high visual quality
+- suitable for a professional blog
+- visually connected to the article topic
 
 Do not include:
 
 - logos
 - watermarks
 - random text
-- UI screenshots
 - distorted objects
-- fake brand logos
+- unnecessary interface elements
 
-Landscape blog featured image.
-16:9 composition.
+Create a wide professional blog featured image.
 `;
 
-    console.log(
-      "Starting AI image generation..."
-    );
-
     try {
-      /*
-       * IMPORTANT:
-       *
-       * Use v1beta instead of v1.
-       * Gemini 3.1 Flash Image supports
-       * 16:9 and imageSize.
-       */
+      console.log("Starting AI image generation...");
 
-      const imageResponse =
-        await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" +
-            encodeURIComponent(apiKey),
-          {
-            method: "POST",
+      const imageResponse = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" +
+          encodeURIComponent(apiKey),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: imagePrompt
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseModalities: ["IMAGE"]
+            }
+          })
+        }
+      );
 
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-
-                  parts: [
-                    {
-                      text: imagePrompt
-                    }
-                  ]
-                }
-              ],
-
-              generationConfig: {
-  responseModalities: ["IMAGE"]
-}
-        );
-
-      const imageData =
-        await imageResponse.json();
+      const imageData = await imageResponse.json();
 
       if (!imageResponse.ok) {
         console.error(
@@ -303,47 +288,29 @@ Landscape blog featured image.
         );
       } else {
         const parts =
-          imageData?.candidates?.[0]
-            ?.content?.parts || [];
+          imageData?.candidates?.[0]?.content?.parts || [];
 
-        console.log(
-          "IMAGE RESPONSE PARTS:",
-          parts.length
+        const imagePart = parts.find(
+          (part) =>
+            part?.inlineData?.data
         );
-
-        const imagePart =
-          parts.find(
-            (part) =>
-              part?.inlineData?.data
-          );
 
         if (imagePart) {
           image = {
             mimeType:
-              imagePart
-                ?.inlineData
-                ?.mimeType ||
+              imagePart.inlineData.mimeType ||
               "image/png",
 
             data:
-              imagePart
-                ?.inlineData
-                ?.data
+              imagePart.inlineData.data
           };
 
           console.log(
-            "AI IMAGE GENERATED SUCCESSFULLY."
+            "IMAGE GENERATED SUCCESSFULLY"
           );
         } else {
           console.error(
-            "IMAGE PART NOT FOUND."
-          );
-
-          console.error(
-            "IMAGE RESPONSE:",
-            JSON.stringify(
-              imageData
-            ).slice(0, 5000)
+            "IMAGE API RETURNED NO IMAGE DATA"
           );
         }
       }
@@ -354,45 +321,35 @@ Landscape blog featured image.
       );
     }
 
-    /* =====================================================
-       STEP 3 — WORD COUNT
-    ===================================================== */
+    // =====================================================
+    // STEP 3 — WORD COUNT
+    // =====================================================
 
     const allText = [
       article.introduction || "",
 
-      ...(article.sections || [])
-        .flatMap(
-          (section) => [
-            section.heading || "",
+      ...(article.sections || []).flatMap(
+        (section) => [
+          section.heading || "",
+          ...(section.paragraphs || []),
+          ...(section.bullets || []),
 
-            ...(section.paragraphs || []),
+          ...(section.subsections || []).flatMap(
+            (subsection) => [
+              subsection.heading || "",
+              ...(subsection.paragraphs || []),
+              ...(subsection.bullets || [])
+            ]
+          )
+        ]
+      ),
 
-            ...(section.bullets || []),
-
-            ...(section.subsections || [])
-              .flatMap(
-                (subsection) => [
-                  subsection.heading ||
-                    "",
-
-                  ...(subsection.paragraphs ||
-                    []),
-
-                  ...(subsection.bullets ||
-                    [])
-                ]
-              )
-          ]
-        ),
-
-      ...(article.faq || [])
-        .flatMap(
-          (item) => [
-            item.question || "",
-            item.answer || ""
-          ]
-        ),
+      ...(article.faq || []).flatMap(
+        (item) => [
+          item.question || "",
+          item.answer || ""
+        ]
+      ),
 
       article.conclusion || ""
     ].join(" ");
@@ -404,18 +361,9 @@ Landscape blog featured image.
         .filter(Boolean)
         .length;
 
-    /* =====================================================
-       STEP 4 — FINAL RESPONSE
-    ===================================================== */
-
-    const imageUrl = image
-      ? `data:${image.mimeType};base64,${image.data}`
-      : null;
-
-    console.log(
-      "FINAL IMAGE AVAILABLE:",
-      Boolean(imageUrl)
-    );
+    // =====================================================
+    // STEP 4 — FINAL RESPONSE
+    // =====================================================
 
     return res.status(200).json({
       success: true,
@@ -431,7 +379,9 @@ Landscape blog featured image.
 
       image,
 
-      imageUrl
+      imageUrl: image
+        ? `data:${image.mimeType};base64,${image.data}`
+        : null
     });
 
   } catch (error) {
