@@ -61,14 +61,9 @@ ${language}
 TONE:
 ${tone}
 
-=====================================================
-WRITING QUALITY
-=====================================================
+WRITING QUALITY:
 
-Write genuinely useful content for real readers.
-
-The article must:
-
+- Write genuinely useful content for real readers.
 - Clearly satisfy the search intent.
 - Explain concepts instead of making vague statements.
 - Use natural human writing.
@@ -76,7 +71,7 @@ The article must:
 - Avoid repetitive wording.
 - Avoid generic filler.
 - Avoid unnecessary introductions.
-- Avoid repeating the same idea.
+- Avoid repeating the same information.
 - Use specific examples where useful.
 - Give actionable advice.
 - Maintain a professional editorial standard.
@@ -95,16 +90,11 @@ DO NOT mention:
 - AutoPilot AI
 
 Do not invent statistics.
-
 Do not create fake studies.
-
 Do not invent citations.
-
 Do not make unsupported factual claims.
 
-=====================================================
-SEO REQUIREMENTS
-=====================================================
+SEO REQUIREMENTS:
 
 1. Create an attractive SEO title.
 2. Include the primary keyword naturally.
@@ -127,9 +117,7 @@ SEO REQUIREMENTS
 19. Create a detailed professional image prompt.
 20. Target approximately 1800-2500 words.
 
-=====================================================
-ARTICLE QUALITY
-=====================================================
+ARTICLE QUALITY:
 
 The introduction must:
 
@@ -145,12 +133,10 @@ Each H2 section must contain:
 - Practical information.
 - Examples where appropriate.
 - Bullets or numbered points where useful.
-- H3 subsections where they genuinely improve readability.
+- H3 subsections where useful.
 
 Do not create empty sections.
-
 Do not create filler content.
-
 Do not repeat the same information across sections.
 
 FAQ:
@@ -173,7 +159,7 @@ The image prompt should describe:
 - mood
 - perspective
 
-Do NOT ask the image model to put:
+Do NOT include:
 
 - text
 - logos
@@ -183,17 +169,7 @@ Do NOT ask the image model to put:
 
 inside the image.
 
-=====================================================
-RETURN JSON ONLY
-=====================================================
-
-Return valid JSON only.
-
-Do not use markdown.
-
-Do not use code fences.
-
-Do not add explanations before or after JSON.
+RETURN JSON ONLY.
 
 Use EXACTLY this structure:
 
@@ -287,7 +263,7 @@ Use EXACTLY this structure:
     }
 
     // =====================================================
-    // EXTRACT ARTICLE TEXT
+    // EXTRACT ARTICLE
     // =====================================================
 
     const articleText =
@@ -302,7 +278,7 @@ Use EXACTLY this structure:
     }
 
     // =====================================================
-    // PARSE ARTICLE JSON
+    // PARSE JSON
     // =====================================================
 
     let article;
@@ -326,7 +302,7 @@ Use EXACTLY this structure:
     }
 
     // =====================================================
-    // STEP 2 — HUGGING FACE FEATURED IMAGE
+    // STEP 2 — HUGGING FACE IMAGE
     // =====================================================
 
     let image = null;
@@ -334,8 +310,7 @@ Use EXACTLY this structure:
     const imagePrompt =
       article.imagePrompt ||
       `
-Create a premium professional editorial featured image
-for a high-quality online article.
+Create a premium professional editorial featured image.
 
 Article topic:
 ${cleanKeyword}
@@ -347,7 +322,6 @@ Create a visually compelling scene that directly represents
 the article topic.
 
 Style:
-
 - photorealistic
 - premium editorial photography
 - modern
@@ -360,7 +334,6 @@ Style:
 - high-end publication quality
 
 Composition:
-
 - wide landscape composition
 - clear main subject
 - strong visual hierarchy
@@ -369,14 +342,12 @@ Composition:
 - balanced composition
 
 Mood:
-
 - professional
 - trustworthy
 - modern
 - visually engaging
 
 Do NOT include:
-
 - text
 - letters
 - words
@@ -388,8 +359,6 @@ Do NOT include:
 - fake interfaces
 - distorted objects
 - duplicated objects
-
-Create a professional blog featured image.
 `;
 
     try {
@@ -406,27 +375,40 @@ Create a professional blog featured image.
         apiKey: hfToken
       });
 
+      console.log(
+        "HF provider: fal-ai"
+      );
+
+      console.log(
+        "HF model: black-forest-labs/FLUX.1-dev"
+      );
+
       // ===================================================
-      // GENERATE IMAGE
+      // IMAGE GENERATION
       // ===================================================
 
       const generatedImage =
         await hf.textToImage(
-          imagePrompt,
           {
             model:
               "black-forest-labs/FLUX.1-dev",
 
-            num_inference_steps: 4,
+            inputs:
+              imagePrompt,
 
-            width: 1344,
-
-            height: 768
+            parameters: {
+              width: 1344,
+              height: 768,
+              num_inference_steps: 4
+            }
+          },
+          {
+            outputType: "blob"
           }
         );
 
       // ===================================================
-      // CONVERT IMAGE TO BASE64
+      // CONVERT BLOB → BASE64
       // ===================================================
 
       const imageBuffer =
@@ -474,6 +456,12 @@ Create a professional blog featured image.
         imageError
       );
 
+      if (imageError?.response) {
+        console.error(
+          "HF ERROR RESPONSE:",
+          imageError.response
+        );
+      }
     }
 
     // =====================================================
