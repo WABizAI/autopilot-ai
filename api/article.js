@@ -389,44 +389,183 @@ image of a premium professional blog article.
 
         console.error(
           "HUGGING FACE IMAGE API ERROR:",
-          errorText
-        );
-      } else {
-        const contentType =
-          hfResponse.headers.get("content-type") ||
-          "image/png";
+// =====================================================
+// STEP 2 — HUGGING FACE FEATURED IMAGE
+// =====================================================
 
-        const imageBuffer = Buffer.from(
-          await hfResponse.arrayBuffer()
-        );
+let image = null;
 
-        if (imageBuffer.length > 0) {
+const imagePrompt =
+  article.imagePrompt ||
+  `
+Create a premium professional editorial photograph
+for a high-quality online article.
+
+Article topic:
+${cleanKeyword}
+
+Article title:
+${article.title || cleanKeyword}
+
+Create a visually compelling scene that directly
+represents the article topic.
+
+Style:
+- photorealistic
+- premium editorial photography
+- modern
+- sophisticated
+- professional
+- cinematic natural lighting
+- realistic materials
+- realistic depth
+- strong composition
+- high-end business publication quality
+
+Composition:
+- wide landscape composition
+- clear main subject
+- strong visual hierarchy
+- natural depth of field
+- professional camera perspective
+
+Do NOT include:
+- text
+- letters
+- words
+- logos
+- brand names
+- watermarks
+- UI
+- screenshots
+- fake interfaces
+- distorted objects
+- duplicated objects
+
+Create a professional blog featured image.
+`;
+
+try {
+  console.log(
+    "Starting Hugging Face image generation..."
+  );
+
+  const imageResponse = await fetch(
+    "https://router.huggingface.co/fal-ai/v1/images/generations",
+    {
+      method: "POST",
+
+      headers: {
+        Authorization: `Bearer ${hfToken}`,
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        model: "black-forest-labs/FLUX.1-schnell",
+
+        prompt: imagePrompt,
+
+        num_images: 1,
+
+        image_size: {
+          width: 1344,
+          height: 768
+        }
+      })
+    }
+  );
+
+  const contentType =
+    imageResponse.headers.get("content-type") || "";
+
+  if (!imageResponse.ok) {
+    const errorText =
+      await imageResponse.text();
+
+    console.error(
+      "HUGGING FACE IMAGE API ERROR STATUS:",
+      imageResponse.status
+    );
+
+    console.error(
+      "HUGGING FACE IMAGE API ERROR:",
+      errorText
+    );
+  } else {
+    if (contentType.includes("application/json")) {
+      const imageData =
+        await imageResponse.json();
+
+      console.log(
+        "HUGGING FACE IMAGE RESPONSE:",
+        JSON.stringify(imageData).slice(0, 2000)
+      );
+
+      const imageUrl =
+        imageData?.images?.[0]?.url ||
+        imageData?.data?.[0]?.url ||
+        imageData?.url ||
+        null;
+
+      if (imageUrl) {
+        const downloadedImage =
+          await fetch(imageUrl);
+
+        if (downloadedImage.ok) {
+          const imageBuffer =
+            Buffer.from(
+              await downloadedImage.arrayBuffer()
+            );
+
           image = {
-            mimeType: contentType,
-            data: imageBuffer.toString("base64")
+            mimeType:
+              downloadedImage.headers.get(
+                "content-type"
+              ) || "image/png",
+
+            data:
+              imageBuffer.toString("base64")
           };
 
           console.log(
             "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
           );
-
-          console.log(
-            "IMAGE SIZE:",
-            imageBuffer.length
-          );
-        } else {
-          console.error(
-            "HUGGING FACE RETURNED EMPTY IMAGE"
-          );
         }
       }
-    } catch (imageError) {
-      console.error(
-        "HUGGING FACE IMAGE GENERATION FAILED:",
-        imageError
-      );
+    } else {
+      const imageBuffer =
+        Buffer.from(
+          await imageResponse.arrayBuffer()
+        );
+
+      if (imageBuffer.length > 0) {
+        image = {
+          mimeType:
+            contentType || "image/png",
+
+          data:
+            imageBuffer.toString("base64")
+        };
+
+        console.log(
+          "HUGGING FACE IMAGE GENERATED SUCCESSFULLY"
+        );
+      }
     }
 
+    if (!image) {
+      console.error(
+        "HUGGING FACE RETURNED NO IMAGE"
+      );
+    }
+  }
+
+} catch (imageError) {
+  console.error(
+    "HUGGING FACE IMAGE GENERATION FAILED:",
+    imageError
+  );
+}
     // =====================================================
     // STEP 3 — WORD COUNT
     // =====================================================
